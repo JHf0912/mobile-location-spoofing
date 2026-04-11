@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.snake.mobilespoofing.app-mergeDebugResources-64:/values/values.xml",
+            "outputFile": "com.snake.mobilespoofing.app-mergeDebugResources-65:/values/values.xml",
             "map": [
                 {
                     "source": "C:\\Users\\26775\\.gradle\\caches\\9.0.0\\transforms\\2bed268d939b77cff92063900879aa38\\transformed\\cardview-1.0.0\\res\\values\\values.xml",

@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.snake.mobilespoofing.app-mergeDebugResources-64:/values-h320dp-port-v13/values-h320dp-port-v13.xml",
+            "outputFile": "com.snake.mobilespoofing.app-mergeDebugResources-65:/values-h320dp-port-v13/values-h320dp-port-v13.xml",
             "map": [
                 {
                     "source": "C:\\Users\\26775\\.gradle\\caches\\9.0.0\\transforms\\e2e5787fcfe4c21f79125a604533e817\\transformed\\material-1.12.0\\res\\values-h320dp-port-v13\\values-h320dp-port-v13.xml",
