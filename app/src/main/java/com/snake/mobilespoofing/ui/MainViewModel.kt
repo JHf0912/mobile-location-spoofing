@@ -1,4 +1,4 @@
-﻿package com.snake.mobilespoofing.ui
+package com.snake.mobilespoofing.ui
 
 import android.Manifest
 import android.app.Application
@@ -7,10 +7,6 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.amap.api.services.core.AMapException
-import com.amap.api.services.core.PoiItem
-import com.amap.api.services.poisearch.PoiResult
-import com.amap.api.services.poisearch.PoiSearch
 import com.snake.mobilespoofing.SpoofingApp
 import com.snake.mobilespoofing.data.FavoriteItem
 import com.snake.mobilespoofing.data.FavoriteRepository
@@ -64,28 +60,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val query = PoiSearch.Query(keyword, "", "")
-        val poiSearch = PoiSearch(context, query)
-        poiSearch.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
-            override fun onPoiSearched(result: PoiResult?, code: Int) {
-                if (code != AMapException.CODE_AMAP_SUCCESS || result == null) {
-                    _uiState.update { it.copy(message = "搜索失败，错误码：$code") }
-                    return
-                }
-                val mapped = result.pois.orEmpty().mapNotNull { item: PoiItem? ->
-                    val latLon = item?.latLonPoint ?: return@mapNotNull null
-                    SearchResultItem(
-                        title = item.title ?: "未命名",
-                        address = item.snippet ?: "",
-                        point = GeoPoint(latLon.latitude, latLon.longitude, CoordType.GCJ02)
-                    )
-                }
-                _uiState.update { it.copy(searchResults = mapped, message = null) }
-            }
-
-            override fun onPoiItemSearched(p0: PoiItem?, p1: Int) = Unit
-        })
-        poiSearch.searchPOIAsyn()
+        _uiState.update {
+            it.copy(
+                searchResults = emptyList(),
+                message = "当前构建未集成高德 Search SDK，请在地图上点选位置"
+            )
+        }
     }
 
     fun onSelectSearchResult(item: SearchResultItem) {
@@ -159,3 +139,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+
+
