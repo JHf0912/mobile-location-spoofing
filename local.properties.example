@@ -1,2 +1,15 @@
-﻿# Place your AMap key here for local debug.
+# Copy to local.properties (git-ignored) and fill in.
+#
+# Everything here can alternatively come from a Gradle property (-P, gradle.properties) or an
+# environment variable of the same name — local.properties is simply the least intrusive place
+# for machine-specific values.
+
+# Android SDK location. Read by the Android Gradle plugin. Omit it if ANDROID_HOME is set.
+#   sdk.dir=D\:\\path\\to\\Android\\Sdk
+
+# AMap (Gaode) API key. Register one at https://console.amap.com/ against the package name
+# com.snake.mobilespoofing *and* the SHA-1 of the certificate you build with — a debug keystore
+# and a release keystore therefore need separately registered keys.
+#
+# Without a key the build still succeeds (it only warns), but the map renders blank at runtime.
 AMAP_API_KEY=replace_with_your_key
