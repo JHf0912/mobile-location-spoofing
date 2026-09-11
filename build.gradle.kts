@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    // Declared here purely so the plugin version is pinned on the buildscript classpath; the
+    // convention plugins are what actually apply it, per module.
+    alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.ksp) apply false
 }
 

@@ -11,6 +11,9 @@ dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.compose.gradlePlugin)
+    // Needed by the pure-JVM convention plugin, which applies org.jetbrains.kotlin.jvm and
+    // configures KotlinJvmProjectExtension. Only *Android* modules get Kotlin from AGP.
+    compileOnly(libs.kotlin.gradlePlugin)
 }
 
 gradlePlugin {
@@ -19,9 +22,17 @@ gradlePlugin {
             id = "mobilespoofing.android.application"
             implementationClass = "com.snake.mobilespoofing.buildlogic.AndroidApplicationConventionPlugin"
         }
+        register("androidLibrary") {
+            id = "mobilespoofing.android.library"
+            implementationClass = "com.snake.mobilespoofing.buildlogic.AndroidLibraryConventionPlugin"
+        }
         register("androidCompose") {
             id = "mobilespoofing.android.compose"
             implementationClass = "com.snake.mobilespoofing.buildlogic.AndroidComposeConventionPlugin"
+        }
+        register("kotlinJvm") {
+            id = "mobilespoofing.kotlin.jvm"
+            implementationClass = "com.snake.mobilespoofing.buildlogic.KotlinJvmConventionPlugin"
         }
     }
 }

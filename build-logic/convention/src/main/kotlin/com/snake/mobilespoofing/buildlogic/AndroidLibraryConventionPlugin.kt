@@ -1,0 +1,50 @@
+package com.snake.mobilespoofing.buildlogic
+
+import com.android.build.api.dsl.LibraryExtension
+import org.gradle.api.JavaVersion
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
+
+/**
+ * Shared configuration for Android library modules.
+ *
+ * The `namespace` is intentionally NOT set here: two modules sharing one is a hard build failure,
+ * so each module must declare its own.
+ */
+class AndroidLibraryConventionPlugin : Plugin<Project> {
+    override fun apply(target: Project): Unit = with(target) {
+        pluginManager.apply("com.android.library")
+
+        val catalog = libs
+        val compileSdkVersion = catalog.intVersion("compileSdk")
+        val minSdkVersion = catalog.intVersion("minSdk")
+
+        extensions.configure<LibraryExtension> {
+            compileSdk = compileSdkVersion
+
+            defaultConfig {
+                minSdk = minSdkVersion
+            }
+
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+
+            buildFeatures {
+                buildConfig = false
+            }
+
+            packaging {
+                resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            }
+
+            // Library unit tests that touch Android types (e.g. a parity check against
+            // android.location.Location) need the merged resources on the test classpath.
+            testOptions {
+                unitTests.isIncludeAndroidResources = true
+            }
+        }
+    }
+}

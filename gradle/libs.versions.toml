@@ -91,6 +91,7 @@ turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 ksp-gradlePlugin = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
 compose-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -98,4 +99,7 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 # plugin is no longer required — applying it fails with "The 'org.jetbrains.kotlin.android' plugin
 # is no longer required for Kotlin support since AGP 9.0." AGP compiles Kotlin itself.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# Pure-JVM modules still need KGP; only *Android* modules get Kotlin from AGP. Pinned to the same
+# version AGP bundles so both ends of the build agree about the compiler.
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
