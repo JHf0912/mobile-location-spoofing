@@ -10,6 +10,12 @@
 #  - Compose 1.12 (BOM 2026.08.00+) requires compileSdk 37 and AGP 9.1.1/9.2.0+.
 
 [versions]
+# Android SDK levels live here so the convention plugins can read them — every module inherits
+# them rather than repeating the numbers.
+compileSdk = "37"
+minSdk = "26"
+targetSdk = "37"
+
 agp = "9.2.1"
 # AGP 9 has built-in Kotlin: it brings its own KGP (2.3.10 for AGP 9.2) and the
 # `org.jetbrains.kotlin.android` plugin must NOT be applied. This `kotlin` version therefore only
@@ -78,6 +84,13 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+# Gradle plugin implementations, for build-logic's compileOnly classpath. A plugin marker artifact
+# does not expose the implementation types, so the -gradlePlugin artifacts are needed to reference
+# e.g. ApplicationExtension from a convention plugin.
+android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+ksp-gradlePlugin = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
+compose-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

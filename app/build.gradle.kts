@@ -1,8 +1,8 @@
 import java.util.Properties
 
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
+    id("mobilespoofing.android.application")
+    id("mobilespoofing.android.compose")
     alias(libs.plugins.ksp)
 }
 
@@ -40,17 +40,11 @@ if (amapKey.isNullOrBlank()) {
 
 android {
     namespace = "com.snake.mobilespoofing"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.snake.mobilespoofing"
-        minSdk = 26
-        targetSdk = 37
         versionCode = 1
         versionName = "1.0.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables { useSupportLibrary = true }
 
         // NOTE: do NOT add an applicationIdSuffix to the debug build type. The AMap key is
         // registered against the package name (and the signing certificate's SHA-1), so a
@@ -89,37 +83,15 @@ android {
             isMinifyEnabled = false
         }
     }
-
-    // With AGP's built-in Kotlin, Kotlin's jvmTarget defaults to
-    // android.compileOptions.targetCompatibility, so no separate kotlin { compilerOptions {} }
-    // block is needed — setting it here covers both Java and Kotlin.
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-    }
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.google.android.material)
 
     implementation(libs.kotlinx.coroutines.android)
@@ -136,7 +108,4 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
-
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
