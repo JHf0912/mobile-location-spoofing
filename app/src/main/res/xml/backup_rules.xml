@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Back up only the favorites database.
+
+  The whole database domain rather than just spoofing.db: Room runs in WAL mode, so the -wal and
+  -shm files are part of the database, and restoring the main file alone can leave it corrupt.
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+</full-backup-content>

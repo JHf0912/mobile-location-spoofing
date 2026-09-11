@@ -106,19 +106,44 @@ class MockLocationService : LifecycleService() {
 
     private fun buildNotification(content: String): Notification {
         ensureChannel()
-        val pendingIntent = PendingIntent.getActivity(
+
+        val openApp = PendingIntent.getActivity(
             this,
-            0,
+            REQUEST_OPEN_APP,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+
+        // getService, not getForegroundService: the service is already running in the foreground,
+        // so this is one of the documented background-start exemptions. Using the foreground
+        // variant would oblige the service to call startForeground within five seconds on a path
+        // whose entire purpose is to shut it down — which turns "stop" into "a new notification".
+        //
+        // A distinct request code matters: with the same one, FLAG_UPDATE_CURRENT would let the
+        // two PendingIntents overwrite each other's extras and both would fire the same action.
+        val stop = PendingIntent.getService(
+            this,
+            REQUEST_STOP,
+            stopIntent(this),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            // Must be a single-colour silhouette: notification small icons are rendered as a mask,
+            // so a full-colour drawable comes out as a solid blob.
+            .setSmallIcon(R.drawable.ic_location_pin)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(content)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(openApp)
+            // Stops the session without opening the app — the only stop affordance that works while
+            // the user is inside whatever app they are testing.
+            .addAction(0, getString(R.string.stop_mock), stop)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
+            // Without this some OEM builds hold the foreground notification back for ~10 seconds,
+            // during which the user has no visible way to stop the session.
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
     }
 
@@ -144,6 +169,9 @@ class MockLocationService : LifecycleService() {
 
         const val ACTION_START = "mock.start"
         const val ACTION_STOP = "mock.stop"
+
+        private const val REQUEST_OPEN_APP = 1
+        private const val REQUEST_STOP = 2
 
         /**
          * Carries only the action. The coordinates live in [SessionConfigStore] because a route is
