@@ -12,6 +12,8 @@
 [versions]
 # Android SDK levels live here so the convention plugins can read them — every module inherits
 # them rather than repeating the numbers.
+# Plain integers. AGP displays this level as "37.0" (API 37, minor version 0), but the Gradle
+# property takes the integer — the convention plugins parse it with toInt(), and "37.0" throws.
 compileSdk = "37"
 minSdk = "26"
 targetSdk = "37"
