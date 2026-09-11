@@ -41,11 +41,10 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
             }
 
-            // Library unit tests that touch Android types (e.g. a parity check against
-            // android.location.Location) need the merged resources on the test classpath.
-            testOptions {
-                unitTests.isIncludeAndroidResources = true
-            }
+            // Deliberately no `unitTests.isIncludeAndroidResources` here. AGP 9 treats the
+            // unit-test resource source set it creates as "test sources present", and then fails
+            // the task with failOnNoDiscoveredTests in any module that has no tests yet. Add it
+            // per-module once that module actually has a test needing merged resources.
         }
 
         dependencies {

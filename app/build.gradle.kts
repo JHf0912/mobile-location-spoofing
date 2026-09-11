@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     id("mobilespoofing.android.application")
     id("mobilespoofing.android.compose")
-    alias(libs.plugins.ksp)
+    id("mobilespoofing.android.hilt")
 }
 
 /**
@@ -103,10 +103,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.google.play.services.location)
-
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
 
     implementation(libs.amap.maps)
 

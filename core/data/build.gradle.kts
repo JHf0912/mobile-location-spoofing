@@ -1,6 +1,7 @@
 plugins {
     id("mobilespoofing.android.library")
-    alias(libs.plugins.ksp)
+    // Applies KSP as well, so no separate alias here.
+    id("mobilespoofing.android.hilt")
 }
 
 android {
@@ -9,10 +10,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:model"))
+    api(project(":core:model"))
     implementation(project(":core:geo"))
 
-    implementation(libs.androidx.room.runtime)
+    // api, not implementation: SpoofingDatabase extends RoomDatabase, so any consumer that
+    // references it needs Room on its own compile classpath too.
+    api(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 }

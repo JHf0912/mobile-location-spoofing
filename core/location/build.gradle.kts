@@ -1,5 +1,6 @@
 plugins {
     id("mobilespoofing.android.library")
+    id("mobilespoofing.android.hilt")
 }
 
 android {

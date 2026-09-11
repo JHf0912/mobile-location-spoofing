@@ -17,6 +17,7 @@ minSdk = "26"
 targetSdk = "37"
 
 agp = "9.2.1"
+hilt = "2.60.1"
 # AGP 9 has built-in Kotlin: it brings its own KGP (2.3.10 for AGP 9.2) and the
 # `org.jetbrains.kotlin.android` plugin must NOT be applied. This `kotlin` version therefore only
 # versions the Compose compiler plugin, which AGP does not take over — and it must match the KGP
@@ -71,6 +72,10 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 # Play services
 google-play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 
+# Dependency injection
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
+
 # Maps
 # Alias is `amap-maps` rather than `amap-3dmap`: catalog segments must start with a letter,
 # so a `3dmap` segment cannot generate a valid Kotlin accessor.
@@ -92,6 +97,7 @@ android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref 
 ksp-gradlePlugin = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
 compose-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+hilt-gradlePlugin = { module = "com.google.dagger:hilt-android-gradle-plugin", version.ref = "hilt" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -103,3 +109,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 # version AGP bundles so both ends of the build agree about the compiler.
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

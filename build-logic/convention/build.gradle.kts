@@ -14,6 +14,7 @@ dependencies {
     // Needed by the pure-JVM convention plugin, which applies org.jetbrains.kotlin.jvm and
     // configures KotlinJvmProjectExtension. Only *Android* modules get Kotlin from AGP.
     compileOnly(libs.kotlin.gradlePlugin)
+    compileOnly(libs.hilt.gradlePlugin)
 }
 
 gradlePlugin {
@@ -33,6 +34,10 @@ gradlePlugin {
         register("kotlinJvm") {
             id = "mobilespoofing.kotlin.jvm"
             implementationClass = "com.snake.mobilespoofing.buildlogic.KotlinJvmConventionPlugin"
+        }
+        register("androidHilt") {
+            id = "mobilespoofing.android.hilt"
+            implementationClass = "com.snake.mobilespoofing.buildlogic.AndroidHiltConventionPlugin"
         }
     }
 }

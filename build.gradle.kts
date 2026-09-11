@@ -5,6 +5,7 @@ plugins {
     // convention plugins are what actually apply it, per module.
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.hilt) apply false
 }
 
 // `./gradlew check` stops at the unit tests and never produces an APK, so a contributor cannot
