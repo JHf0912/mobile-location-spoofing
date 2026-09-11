@@ -1,15 +1,13 @@
 # Gradle version catalog — the single source of truth for dependency and plugin versions.
 # Referenced from build files as `libs.*` (e.g. libs.androidx.core.ktx, libs.plugins.kotlin.android).
 #
-# ⚠️ Step 1A of the toolchain migration: AGP/Gradle/Kotlin are on the new (AGP 9) line, while the
-# AndroidX libraries are deliberately still pinned to the compileSdk 36 era. That keeps the build
-# tooling change and the dependency upgrade separately attributable if something breaks.
-# Step 1B raises compileSdk to 37 and takes the AndroidX libraries to current.
+# Toolchain: AGP 9 line, compileSdk 37.
 #
 # Constraints that are easy to get wrong:
 #  - AGP 9.2.0 has a known R8 `ClassNotFoundException: com.android.tools.r8.RecordTag` → use 9.2.1.
-#  - AGP 9.2 requires Gradle 9.4.1 (minimum = default) and JDK 17+.
+#  - AGP 9.2 requires Gradle 9.4.1 (minimum = default) and JDK 17+ (24 verified working).
 #  - KSP moved to an independent version scheme: 2.3.x, no longer "<kotlin>-<ksp>".
+#  - Compose 1.12 (BOM 2026.08.00+) requires compileSdk 37 and AGP 9.1.1/9.2.0+.
 
 [versions]
 agp = "9.2.1"
@@ -20,22 +18,22 @@ agp = "9.2.1"
 kotlin = "2.3.10"
 ksp = "2.3.12"
 
-# AndroidX — compileSdk 36 era (step 1A)
-coreKtx = "1.17.0"
-lifecycle = "2.9.4"
-activityCompose = "1.12.4"
-composeBom = "2025.11.01"
-material = "1.12.0"
-room = "2.7.2"
+# AndroidX
+coreKtx = "1.19.0"
+lifecycle = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.09.00"
+material = "1.14.0"
+room = "2.8.5"
 
 # Google Play services
-playServicesLocation = "21.3.0"
+playServicesLocation = "21.4.0"
 
 # Third-party
 amap3dmap = "10.0.600"
 
 # Kotlin ecosystem
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 turbine = "1.2.1"
 
 # Test
