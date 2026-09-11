@@ -14,13 +14,16 @@ import com.snake.mobilespoofing.R
 import com.snake.mobilespoofing.core.geo.CoordinateTransformer
 import com.snake.mobilespoofing.core.location.MockLocationEngine
 import com.snake.mobilespoofing.core.location.MockStatusStore
-import com.snake.mobilespoofing.core.location.toLocation
 import com.snake.mobilespoofing.core.model.CoordType
+import com.snake.mobilespoofing.core.model.Fix
 import com.snake.mobilespoofing.core.model.GeoPoint
 import com.snake.mobilespoofing.core.model.MockStatus
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -63,20 +66,29 @@ class MockLocationService : LifecycleService() {
     private fun startLoop(point: GeoPoint) {
         loopJob?.cancel()
         loopJob = scope.launch {
-            runCatching { engine.startMockMode() }
-                .onFailure {
-                    statusStore.emit(MockStatus.Error("无法开启模拟模式：${it.message}"))
-                    stopLoop()
-                    return@launch
-                }
+            try {
+                engine.startMockMode()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                statusStore.emit(MockStatus.Error("无法开启模拟模式：${e.message}"))
+                stopLoop()
+                return@launch
+            }
 
             while (isActive) {
-                val wgs = CoordinateTransformer.toWgs84(point)
-                runCatching {
-                    engine.push(wgs.toLocation())
-                    statusStore.emit(MockStatus.Running(wgs.copy(coordType = CoordType.WGS84), System.currentTimeMillis()))
-                }.onFailure {
-                    statusStore.emit(MockStatus.Error("注入失败：${it.message}"))
+                // Converted once, and the injectors require WGS84.
+                val wgs = CoordinateTransformer.toWgs84(point).copy(coordType = CoordType.WGS84)
+                try {
+                    engine.push(Fix(point = wgs))
+                    statusStore.emit(MockStatus.Running(wgs, System.currentTimeMillis()))
+                } catch (e: CancellationException) {
+                    // Must be rethrown. runCatching here would swallow cancellation, so a cancel
+                    // from stopLoop could be absorbed by an in-flight await() and the loop would
+                    // keep injecting after the user pressed stop.
+                    throw e
+                } catch (e: Exception) {
+                    statusStore.emit(MockStatus.Error("注入失败：${e.message}"))
                 }
                 delay(INJECT_INTERVAL_MS)
             }
@@ -86,7 +98,16 @@ class MockLocationService : LifecycleService() {
     private fun stopLoop() {
         loopJob?.cancel()
         scope.launch {
-            runCatching { engine.stopMockMode() }
+            // Teardown must happen even though the loop above was just cancelled: a LocationManager
+            // test provider outlives this process, so skipping this leaves the device reporting a
+            // mock position to every app until it is rebooted.
+            try {
+                engine.stopMockMode()
+            } catch (e: CancellationException) {
+                withContext(NonCancellable) { engine.stopMockMode() }
+            } catch (_: Exception) {
+                // Nothing useful to do — the status reset below still matters.
+            }
             statusStore.emit(MockStatus.Idle)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
