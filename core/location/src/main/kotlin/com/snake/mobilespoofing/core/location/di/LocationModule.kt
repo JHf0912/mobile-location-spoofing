@@ -7,6 +7,8 @@ import com.snake.mobilespoofing.core.location.CompositeMockLocationEngine
 import com.snake.mobilespoofing.core.location.FusedMockLocationEngine
 import com.snake.mobilespoofing.core.location.LocationManagerMockEngine
 import com.snake.mobilespoofing.core.location.MockLocationEngine
+import com.snake.mobilespoofing.core.location.MockSessionRunner
+import com.snake.mobilespoofing.core.location.MockStatusStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,4 +42,16 @@ object LocationModule {
         fused: FusedMockLocationEngine,
         locationManager: LocationManagerMockEngine,
     ): MockLocationEngine = CompositeMockLocationEngine(listOf(fused, locationManager))
+
+    /**
+     * Built by hand rather than via `@Inject`: the clock and dispatcher are constructor parameters
+     * with defaults specifically so tests can substitute them, and asking Dagger to supply a
+     * `CoroutineDispatcher` would mean inventing a qualifier for no benefit.
+     */
+    @Provides
+    @Singleton
+    fun mockSessionRunner(
+        engine: MockLocationEngine,
+        statusStore: MockStatusStore,
+    ): MockSessionRunner = MockSessionRunner(engine, statusStore)
 }

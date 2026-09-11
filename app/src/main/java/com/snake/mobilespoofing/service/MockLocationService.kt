@@ -1,4 +1,4 @@
-﻿package com.snake.mobilespoofing.service
+package com.snake.mobilespoofing.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,106 +12,95 @@ import androidx.lifecycle.LifecycleService
 import com.snake.mobilespoofing.MainActivity
 import com.snake.mobilespoofing.R
 import com.snake.mobilespoofing.core.geo.CoordinateTransformer
-import com.snake.mobilespoofing.core.location.MockLocationEngine
+import com.snake.mobilespoofing.core.geo.StaticMovementSource
+import com.snake.mobilespoofing.core.location.MockSessionRunner
 import com.snake.mobilespoofing.core.location.MockStatusStore
+import com.snake.mobilespoofing.core.location.SessionConfig
 import com.snake.mobilespoofing.core.model.CoordType
-import com.snake.mobilespoofing.core.model.Fix
 import com.snake.mobilespoofing.core.model.GeoPoint
 import com.snake.mobilespoofing.core.model.MockStatus
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
+/**
+ * Thin Android shell around [MockSessionRunner].
+ *
+ * The injection loop itself lives in the runner so it can be tested without a device; this class
+ * only deals with intents, the foreground notification and the service lifecycle.
+ */
 @AndroidEntryPoint
 class MockLocationService : LifecycleService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var loopJob: Job? = null
 
-    // Field injection is populated before onCreate runs, but NOT before a property initializer —
-    // so these must be `lateinit var` used from onCreate onward, never read in an init block.
-    @Inject lateinit var engine: MockLocationEngine
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    // Field injection is populated before onCreate, but not before a property initializer — so
+    // these must be lateinit vars used from onCreate onward.
+    @Inject lateinit var runner: MockSessionRunner
     @Inject lateinit var statusStore: MockStatusStore
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START -> {
-                val lat = intent.getDoubleExtra(EXTRA_LAT, Double.NaN)
-                val lng = intent.getDoubleExtra(EXTRA_LNG, Double.NaN)
-                val coordType = CoordType.valueOf(intent.getStringExtra(EXTRA_COORD_TYPE) ?: CoordType.GCJ02.name)
-                if (lat.isNaN() || lng.isNaN()) {
-                    statusStore.emit(MockStatus.Error("参数错误：经纬度为空"))
-                    return START_NOT_STICKY
-                }
-                val target = GeoPoint(lat, lng, coordType)
-                startForeground(NOTIFY_ID, buildNotification("模拟中"))
-                startLoop(target)
-            }
-
-            ACTION_STOP -> {
-                stopLoop()
-            }
-        }
-        return START_STICKY
-    }
-
-    private fun startLoop(point: GeoPoint) {
-        loopJob?.cancel()
-        loopJob = scope.launch {
-            try {
-                engine.startMockMode()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                statusStore.emit(MockStatus.Error("无法开启模拟模式：${e.message}"))
-                stopLoop()
-                return@launch
-            }
-
-            while (isActive) {
-                // Converted once, and the injectors require WGS84.
-                val wgs = CoordinateTransformer.toWgs84(point).copy(coordType = CoordType.WGS84)
-                try {
-                    engine.push(Fix(point = wgs))
-                    statusStore.emit(MockStatus.Running(wgs, System.currentTimeMillis()))
-                } catch (e: CancellationException) {
-                    // Must be rethrown. runCatching here would swallow cancellation, so a cancel
-                    // from stopLoop could be absorbed by an in-flight await() and the loop would
-                    // keep injecting after the user pressed stop.
-                    throw e
-                } catch (e: Exception) {
-                    statusStore.emit(MockStatus.Error("注入失败：${e.message}"))
-                }
-                delay(INJECT_INTERVAL_MS)
-            }
-        }
-    }
-
-    private fun stopLoop() {
-        loopJob?.cancel()
-        scope.launch {
-            // Teardown must happen even though the loop above was just cancelled: a LocationManager
-            // test provider outlives this process, so skipping this leaves the device reporting a
-            // mock position to every app until it is rebooted.
-            try {
-                engine.stopMockMode()
-            } catch (e: CancellationException) {
-                withContext(NonCancellable) { engine.stopMockMode() }
-            } catch (_: Exception) {
-                // Nothing useful to do — the status reset below still matters.
-            }
-            statusStore.emit(MockStatus.Idle)
-            stopForeground(STOP_FOREGROUND_REMOVE)
+        if (intent == null) {
+            // A sticky restart delivers a null intent: no action, no payload. Falling through the
+            // `when` here is what used to leave a running service that never called
+            // startForeground and never injected anything.
             stopSelf()
+            return START_NOT_STICKY
         }
+
+        when (intent.action) {
+            ACTION_START -> handleStart(intent)
+            ACTION_STOP -> runner.stop()
+            else -> stopSelf()
+        }
+
+        // Never sticky, on every path. Resuming a mock session without the user asking would
+        // silently start reporting a fake position again, and on Android 12+ a sticky restart
+        // counts as a background foreground-service start with a five-second deadline to call
+        // startForeground — failing which the app crashes rather than quietly doing nothing.
+        return START_NOT_STICKY
+    }
+
+    private fun handleStart(intent: Intent) {
+        val latitude = intent.getDoubleExtra(EXTRA_LAT, Double.NaN)
+        val longitude = intent.getDoubleExtra(EXTRA_LNG, Double.NaN)
+        val coordType = intent.getStringExtra(EXTRA_COORD_TYPE)
+            ?.let { raw -> CoordType.entries.firstOrNull { it.name == raw } }
+            ?: CoordType.GCJ02
+
+        if (latitude.isNaN() || longitude.isNaN()) {
+            statusStore.emit(MockStatus.Error("参数错误：经纬度为空"))
+            stopSelf()
+            return
+        }
+
+        // Both injectors require WGS84, so convert once here at the boundary rather than leaving a
+        // datum-tagged point to leak into the engine.
+        val target = CoordinateTransformer.toWgs84(GeoPoint(latitude, longitude, coordType))
+            .copy(coordType = CoordType.WGS84)
+
+        startForeground(NOTIFY_ID, buildNotification("模拟中"))
+        runner.start(
+            scope = scope,
+            source = StaticMovementSource(target),
+            config = SessionConfig(),
+            onFinished = { finishSession() },
+        )
+    }
+
+    private fun finishSession() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        // Cancelling the runner first lets it run its NonCancellable teardown before the scope goes.
+        runner.stop()
+        scope.cancel()
+        super.onDestroy()
     }
 
     private fun buildNotification(content: String): Notification {
@@ -120,7 +109,7 @@ class MockLocationService : LifecycleService() {
             this,
             0,
             Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
@@ -128,26 +117,29 @@ class MockLocationService : LifecycleService() {
             .setContentText(content)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
     }
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return
-        }
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Mock Location",
-            NotificationManager.IMPORTANCE_LOW
-        )
+            // IMPORTANCE_LOW is a trap on MIUI/EMUI/ColorOS, which collapse or hide
+            // low-importance ongoing notifications — and that removes the user's main way to stop
+            // a running session. Default importance, kept silent instead.
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            setSound(null, null)
+            enableVibration(false)
+        }
         manager.createNotificationChannel(channel)
     }
 
     companion object {
         private const val CHANNEL_ID = "mock_location_channel"
         private const val NOTIFY_ID = 1001
-        private const val INJECT_INTERVAL_MS = 800L
 
         const val ACTION_START = "mock.start"
         const val ACTION_STOP = "mock.stop"
