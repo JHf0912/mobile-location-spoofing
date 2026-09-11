@@ -1,0 +1,35 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Android Studio / IntelliJ
+# `.idea/codeStyles` is IntelliJ-only XML; code style is shared via .editorconfig instead,
+# which every IDE reads. Keeping the whole directory out avoids per-machine churn.
+.idea/
+*.iml
+captures/
+.navigation/
+
+# Local machine config — never commit (holds sdk.dir and the AMap key)
+local.properties
+
+# Signing material — never commit
+keystore.properties
+*.jks
+*.keystore
+
+# Build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+output-metadata.json
+
+# Logs & profiling
+*.log
+*.hprof
+
+# OS noise
+.DS_Store
+Thumbs.db
