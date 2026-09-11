@@ -1,9 +1,9 @@
 ﻿package com.snake.mobilespoofing.ui
 
-import com.snake.mobilespoofing.data.FavoriteItem
-import com.snake.mobilespoofing.location.CoordType
-import com.snake.mobilespoofing.location.GeoPoint
-import com.snake.mobilespoofing.location.MockStatus
+import com.snake.mobilespoofing.core.model.CoordType
+import com.snake.mobilespoofing.core.model.FavoriteItem
+import com.snake.mobilespoofing.core.model.GeoPoint
+import com.snake.mobilespoofing.core.model.MockStatus
 
 data class MainUiState(
     val selectedPoint: GeoPoint? = null,

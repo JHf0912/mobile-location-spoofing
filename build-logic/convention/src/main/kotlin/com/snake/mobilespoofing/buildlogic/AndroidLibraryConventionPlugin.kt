@@ -5,6 +5,7 @@ import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.dependencies
 
 /**
  * Shared configuration for Android library modules.
@@ -45,6 +46,12 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             testOptions {
                 unitTests.isIncludeAndroidResources = true
             }
+        }
+
+        dependencies {
+            add("testImplementation", catalog.findLibrary("junit").get())
+            add("testImplementation", catalog.findLibrary("kotlinx-coroutines-test").get())
+            add("testImplementation", catalog.findLibrary("turbine").get())
         }
     }
 }

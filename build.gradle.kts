@@ -10,8 +10,20 @@ plugins {
 // `./gradlew check` stops at the unit tests and never produces an APK, so a contributor cannot
 // verify the project the way CI does with one command. This adds the missing piece without
 // pulling in an external task runner.
+//
+// Module test tasks are attached by plugin id rather than by name so that adding a module needs
+// no change here — and so no task is realised eagerly at configuration time.
 tasks.register("verify") {
     group = "verification"
-    description = "Assembles the debug APK and runs the unit tests — what CI runs."
-    dependsOn(":app:assembleDebug", ":app:testDebugUnitTest")
+    description = "Builds the debug APK and runs every module's unit tests — what CI runs."
+    dependsOn(":app:assembleDebug")
+
+    subprojects.forEach { sub ->
+        sub.plugins.withId("com.android.library") {
+            dependsOn("${sub.path}:testDebugUnitTest")
+        }
+        sub.plugins.withId("org.jetbrains.kotlin.jvm") {
+            dependsOn("${sub.path}:test")
+        }
+    }
 }

@@ -61,9 +61,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.amap.api.maps.MapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MarkerOptions
-import com.snake.mobilespoofing.data.FavoriteItem
-import com.snake.mobilespoofing.location.CoordType
-import com.snake.mobilespoofing.location.MockStatus
+import com.snake.mobilespoofing.core.model.CoordType
+import com.snake.mobilespoofing.core.model.FavoriteItem
+import com.snake.mobilespoofing.core.model.MockStatus
 import com.snake.mobilespoofing.ui.MainViewModel
 import com.snake.mobilespoofing.ui.SearchResultItem
 

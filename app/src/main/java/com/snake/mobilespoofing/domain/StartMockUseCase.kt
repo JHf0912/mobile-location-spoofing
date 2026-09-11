@@ -1,8 +1,8 @@
 ﻿package com.snake.mobilespoofing.domain
 
 import android.content.Context
-import com.snake.mobilespoofing.location.CoordType
-import com.snake.mobilespoofing.location.GeoPoint
+import com.snake.mobilespoofing.core.model.CoordType
+import com.snake.mobilespoofing.core.model.GeoPoint
 import com.snake.mobilespoofing.service.MockLocationService
 
 class StartMockUseCase(private val context: Context) {

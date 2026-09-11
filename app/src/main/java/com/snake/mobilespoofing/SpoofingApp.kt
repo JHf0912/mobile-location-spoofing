@@ -2,13 +2,13 @@
 
 import android.app.Application
 import com.google.android.gms.location.LocationServices
-import com.snake.mobilespoofing.data.FavoriteRepository
-import com.snake.mobilespoofing.data.SpoofingDatabase
+import com.snake.mobilespoofing.core.data.FavoriteRepository
+import com.snake.mobilespoofing.core.data.SpoofingDatabase
+import com.snake.mobilespoofing.core.geo.CoordinateTransformer
+import com.snake.mobilespoofing.core.location.FusedMockLocationEngine
+import com.snake.mobilespoofing.core.location.MockStatusStore
 import com.snake.mobilespoofing.domain.StartMockUseCase
 import com.snake.mobilespoofing.domain.StopMockUseCase
-import com.snake.mobilespoofing.location.CoordinateTransformer
-import com.snake.mobilespoofing.location.FusedMockLocationEngine
-import com.snake.mobilespoofing.location.MockStatusStore
 
 class SpoofingApp : Application() {
     lateinit var container: AppContainer

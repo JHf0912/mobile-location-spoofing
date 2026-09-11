@@ -12,11 +12,11 @@ import androidx.lifecycle.LifecycleService
 import com.snake.mobilespoofing.MainActivity
 import com.snake.mobilespoofing.R
 import com.snake.mobilespoofing.SpoofingApp
-import com.snake.mobilespoofing.location.CoordType
-import com.snake.mobilespoofing.location.CoordinateTransformer
-import com.snake.mobilespoofing.location.GeoPoint
-import com.snake.mobilespoofing.location.MockStatus
-import com.snake.mobilespoofing.location.toLocation
+import com.snake.mobilespoofing.core.geo.CoordinateTransformer
+import com.snake.mobilespoofing.core.location.toLocation
+import com.snake.mobilespoofing.core.model.CoordType
+import com.snake.mobilespoofing.core.model.GeoPoint
+import com.snake.mobilespoofing.core.model.MockStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
