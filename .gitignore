@@ -33,3 +33,7 @@ output-metadata.json
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Local scratch space for files that belong to this machine, not to the project.
+# Whatever lands here is deliberately kept out of version control.
+tmp/

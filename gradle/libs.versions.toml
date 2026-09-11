@@ -1,0 +1,78 @@
+# Gradle version catalog — the single source of truth for dependency and plugin versions.
+# Referenced from build files as `libs.*` (e.g. libs.androidx.core.ktx, libs.plugins.kotlin.android).
+#
+# NOTE: the versions below are the project's pre-existing ones. They are deliberately being
+# introduced unchanged so that any catalog-syntax problem surfaces on its own, separately from
+# the toolchain upgrade that follows.
+
+[versions]
+agp = "8.4.2"
+kotlin = "1.9.24"
+ksp = "1.9.24-1.0.20"
+composeCompiler = "1.5.14"
+
+# AndroidX
+coreKtx = "1.13.1"
+lifecycle = "2.8.2"
+activityCompose = "1.9.0"
+compose = "1.6.8"
+composeMaterial3 = "1.2.1"
+material = "1.12.0"
+room = "2.6.1"
+
+# Google Play services
+playServicesLocation = "21.2.0"
+
+# Third-party
+amap3dmap = "10.0.600"
+
+# Kotlin ecosystem
+coroutines = "1.8.1"
+turbine = "1.1.0"
+
+# Test
+junit = "4.13.2"
+
+[libraries]
+# AndroidX core & lifecycle
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+
+# Compose
+androidx-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "compose" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "compose" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "compose" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "composeMaterial3" }
+google-android-material = { module = "com.google.android.material:material", version.ref = "material" }
+
+# Room
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# Play services
+google-play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+
+# Maps
+# Alias is `amap-maps` rather than `amap-3dmap`: catalog segments must start with a letter,
+# so a `3dmap` segment cannot generate a valid Kotlin accessor.
+amap-maps = { module = "com.amap.api:3dmap", version.ref = "amap3dmap" }
+
+# Kotlin ecosystem
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+
+# Test
+junit = { module = "junit:junit", version.ref = "junit" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
