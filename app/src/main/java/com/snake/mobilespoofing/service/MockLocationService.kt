@@ -11,13 +11,11 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import com.snake.mobilespoofing.MainActivity
 import com.snake.mobilespoofing.R
-import com.snake.mobilespoofing.core.geo.CoordinateTransformer
-import com.snake.mobilespoofing.core.geo.StaticMovementSource
+import com.snake.mobilespoofing.core.geo.toMovementSource
 import com.snake.mobilespoofing.core.location.MockSessionRunner
 import com.snake.mobilespoofing.core.location.MockStatusStore
 import com.snake.mobilespoofing.core.location.SessionConfig
-import com.snake.mobilespoofing.core.model.CoordType
-import com.snake.mobilespoofing.core.model.GeoPoint
+import com.snake.mobilespoofing.core.location.SessionConfigStore
 import com.snake.mobilespoofing.core.model.MockStatus
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -41,6 +39,7 @@ class MockLocationService : LifecycleService() {
     // these must be lateinit vars used from onCreate onward.
     @Inject lateinit var runner: MockSessionRunner
     @Inject lateinit var statusStore: MockStatusStore
+    @Inject lateinit var sessionConfigStore: SessionConfigStore
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null) {
@@ -52,7 +51,7 @@ class MockLocationService : LifecycleService() {
         }
 
         when (intent.action) {
-            ACTION_START -> handleStart(intent)
+            ACTION_START -> handleStart()
             ACTION_STOP -> runner.stop()
             else -> stopSelf()
         }
@@ -64,28 +63,30 @@ class MockLocationService : LifecycleService() {
         return START_NOT_STICKY
     }
 
-    private fun handleStart(intent: Intent) {
-        val latitude = intent.getDoubleExtra(EXTRA_LAT, Double.NaN)
-        val longitude = intent.getDoubleExtra(EXTRA_LNG, Double.NaN)
-        val coordType = intent.getStringExtra(EXTRA_COORD_TYPE)
-            ?.let { raw -> CoordType.entries.firstOrNull { it.name == raw } }
-            ?: CoordType.GCJ02
-
-        if (latitude.isNaN() || longitude.isNaN()) {
-            statusStore.emit(MockStatus.Error("参数错误：经纬度为空"))
+    private fun handleStart() {
+        val spec = sessionConfigStore.pending.value
+        if (spec == null) {
+            // Nothing to run. This is the expected state after a process restart, since the store
+            // does not survive one.
+            statusStore.emit(MockStatus.Error("参数错误：未选择要模拟的位置"))
             stopSelf()
             return
         }
 
-        // Both injectors require WGS84, so convert once here at the boundary rather than leaving a
-        // datum-tagged point to leak into the engine.
-        val target = CoordinateTransformer.toWgs84(GeoPoint(latitude, longitude, coordType))
-            .copy(coordType = CoordType.WGS84)
+        val source = try {
+            spec.toMovementSource()
+        } catch (e: IllegalArgumentException) {
+            // Surfaced rather than substituted: every rejection here means the resulting position
+            // would not be what the user asked for.
+            statusStore.emit(MockStatus.Error("无法开始：${e.message}"))
+            stopSelf()
+            return
+        }
 
         startForeground(NOTIFY_ID, buildNotification("模拟中"))
         runner.start(
             scope = scope,
-            source = StaticMovementSource(target),
+            source = source,
             config = SessionConfig(),
             onFinished = { finishSession() },
         )
@@ -143,16 +144,14 @@ class MockLocationService : LifecycleService() {
 
         const val ACTION_START = "mock.start"
         const val ACTION_STOP = "mock.stop"
-        private const val EXTRA_LAT = "extra_lat"
-        private const val EXTRA_LNG = "extra_lng"
-        private const val EXTRA_COORD_TYPE = "extra_coord_type"
 
-        fun startIntent(context: Context, point: GeoPoint): Intent {
+        /**
+         * Carries only the action. The coordinates live in [SessionConfigStore] because a route is
+         * a list of them, which an Intent extra cannot hold without marshalling.
+         */
+        fun startIntent(context: Context): Intent {
             return Intent(context, MockLocationService::class.java).apply {
                 action = ACTION_START
-                putExtra(EXTRA_LAT, point.latitude)
-                putExtra(EXTRA_LNG, point.longitude)
-                putExtra(EXTRA_COORD_TYPE, point.coordType.name)
             }
         }
 

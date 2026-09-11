@@ -7,6 +7,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.snake.mobilespoofing.core.data.FavoriteRepository
+import com.snake.mobilespoofing.core.geo.CoordinateTransformer
+import com.snake.mobilespoofing.core.geo.EndBehavior
+import com.snake.mobilespoofing.core.geo.MovementSpec
+import com.snake.mobilespoofing.core.geo.TravelSpeeds
 import com.snake.mobilespoofing.core.location.MockPermissionChecker
 import com.snake.mobilespoofing.core.location.MockStatusStore
 import com.snake.mobilespoofing.core.model.CoordType
@@ -42,38 +46,44 @@ class MainViewModel @Inject constructor(
         refreshCapabilities()
     }
 
+    /**
+     * Map taps arrive in GCJ02 — that is AMap's datum — and are converted immediately, so every
+     * position held in state is WGS84.
+     */
     fun onMapPointSelected(latitude: Double, longitude: Double) {
-        _uiState.update { it.copy(selectedPoint = GeoPoint(latitude, longitude, it.selectedCoordType), message = null) }
-    }
-
-    fun onCoordTypeChanged(type: CoordType) {
-        _uiState.update { current ->
-            val selected = current.selectedPoint?.copy(coordType = type)
-            current.copy(selectedCoordType = type, selectedPoint = selected)
+        val wgs84 = CoordinateTransformer.toWgs84(GeoPoint(latitude, longitude, CoordType.GCJ02))
+        _uiState.update { state ->
+            when (state.mode) {
+                SimulationMode.STATIC -> state.copy(selectedPoint = wgs84, message = null)
+                SimulationMode.ROUTE -> state.copy(
+                    routeWaypoints = state.routeWaypoints + wgs84,
+                    message = null,
+                )
+            }
         }
     }
 
-    fun onSearchKeywordChange(value: String) {
-        _uiState.update { it.copy(searchKeyword = value) }
+    fun onModeChanged(mode: SimulationMode) {
+        _uiState.update { it.copy(mode = mode, message = null) }
     }
 
-    fun searchPoi(context: Context) {
-        val keyword = _uiState.value.searchKeyword.trim()
-        if (keyword.isEmpty()) {
-            _uiState.update { it.copy(message = "请输入搜索关键字") }
-            return
-        }
+    fun onTravelSpeedChanged(speed: TravelSpeeds) {
+        _uiState.update { it.copy(travelSpeed = speed) }
+    }
 
-        _uiState.update {
-            it.copy(
-                searchResults = emptyList(),
-                message = "当前构建未集成高德 Search SDK，请在地图上点选位置",
-            )
+    fun onEndBehaviorChanged(behavior: EndBehavior) {
+        _uiState.update { it.copy(endBehavior = behavior) }
+    }
+
+    fun onUndoLastWaypoint() {
+        _uiState.update { state ->
+            if (state.routeWaypoints.isEmpty()) state
+            else state.copy(routeWaypoints = state.routeWaypoints.dropLast(1))
         }
     }
 
-    fun onSelectSearchResult(item: SearchResultItem) {
-        _uiState.update { it.copy(selectedPoint = item.point, message = null) }
+    fun onClearRoute() {
+        _uiState.update { it.copy(routeWaypoints = emptyList(), message = null) }
     }
 
     fun saveFavorite(name: String) {
@@ -92,7 +102,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun pickFavorite(item: FavoriteItem) {
-        _uiState.update { it.copy(selectedPoint = item.point) }
+        _uiState.update { it.copy(selectedPoint = item.point, message = null) }
     }
 
     fun startMock() {
@@ -105,11 +115,36 @@ class MainViewModel @Inject constructor(
             _uiState.update { it.copy(message = "请在开发者选项中将本应用设为模拟位置应用") }
             return
         }
-        val point = state.selectedPoint ?: run {
-            _uiState.update { it.copy(message = "请先在地图上选点") }
+
+        val spec = buildSpec(state) ?: run {
+            _uiState.update {
+                it.copy(
+                    message = when (state.mode) {
+                        SimulationMode.STATIC -> "请先在地图上选点"
+                        SimulationMode.ROUTE -> "路线至少需要 ${MainUiState.MIN_ROUTE_WAYPOINTS} 个途经点"
+                    },
+                )
+            }
             return
         }
-        startMockUseCase(point)
+
+        startMockUseCase(spec)
+    }
+
+    private fun buildSpec(state: MainUiState): MovementSpec? = when (state.mode) {
+        SimulationMode.STATIC -> state.selectedPoint?.let(MovementSpec::Static)
+
+        SimulationMode.ROUTE ->
+            if (state.routeWaypoints.size >= MainUiState.MIN_ROUTE_WAYPOINTS) {
+                MovementSpec.RouteSpec(
+                    waypointsWgs84 = state.routeWaypoints,
+                    speedMetersPerSecond = state.travelSpeed.metersPerSecond,
+                    endBehavior = state.endBehavior,
+                    closedLoop = state.endBehavior == EndBehavior.LOOP,
+                )
+            } else {
+                null
+            }
     }
 
     fun stopMock() {
