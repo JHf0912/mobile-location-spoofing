@@ -3,10 +3,13 @@ package com.snake.mobilespoofing.core.data
 import com.snake.mobilespoofing.core.model.CoordType
 import com.snake.mobilespoofing.core.model.FavoriteItem
 import com.snake.mobilespoofing.core.model.GeoPoint
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class FavoriteRepository(private val dao: FavoriteDao) {
+@Singleton
+class FavoriteRepository @Inject constructor(private val dao: FavoriteDao) {
 
     fun observeAll(): Flow<List<FavoriteItem>> =
         dao.observeAll().map { rows ->

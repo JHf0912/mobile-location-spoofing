@@ -11,12 +11,15 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import com.snake.mobilespoofing.MainActivity
 import com.snake.mobilespoofing.R
-import com.snake.mobilespoofing.SpoofingApp
 import com.snake.mobilespoofing.core.geo.CoordinateTransformer
+import com.snake.mobilespoofing.core.location.MockLocationEngine
+import com.snake.mobilespoofing.core.location.MockStatusStore
 import com.snake.mobilespoofing.core.location.toLocation
 import com.snake.mobilespoofing.core.model.CoordType
 import com.snake.mobilespoofing.core.model.GeoPoint
 import com.snake.mobilespoofing.core.model.MockStatus
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,13 +28,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class MockLocationService : LifecycleService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var loopJob: Job? = null
 
-    private val container by lazy {
-        (application as SpoofingApp).container
-    }
+    // Field injection is populated before onCreate runs, but NOT before a property initializer —
+    // so these must be `lateinit var` used from onCreate onward, never read in an init block.
+    @Inject lateinit var engine: MockLocationEngine
+    @Inject lateinit var statusStore: MockStatusStore
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -40,7 +45,7 @@ class MockLocationService : LifecycleService() {
                 val lng = intent.getDoubleExtra(EXTRA_LNG, Double.NaN)
                 val coordType = CoordType.valueOf(intent.getStringExtra(EXTRA_COORD_TYPE) ?: CoordType.GCJ02.name)
                 if (lat.isNaN() || lng.isNaN()) {
-                    container.statusStore.emit(MockStatus.Error("参数错误：经纬度为空"))
+                    statusStore.emit(MockStatus.Error("参数错误：经纬度为空"))
                     return START_NOT_STICKY
                 }
                 val target = GeoPoint(lat, lng, coordType)
@@ -58,9 +63,9 @@ class MockLocationService : LifecycleService() {
     private fun startLoop(point: GeoPoint) {
         loopJob?.cancel()
         loopJob = scope.launch {
-            runCatching { container.engine.startMockMode() }
+            runCatching { engine.startMockMode() }
                 .onFailure {
-                    container.statusStore.emit(MockStatus.Error("无法开启模拟模式：${it.message}"))
+                    statusStore.emit(MockStatus.Error("无法开启模拟模式：${it.message}"))
                     stopLoop()
                     return@launch
                 }
@@ -68,10 +73,10 @@ class MockLocationService : LifecycleService() {
             while (isActive) {
                 val wgs = CoordinateTransformer.toWgs84(point)
                 runCatching {
-                    container.engine.push(wgs.toLocation())
-                    container.statusStore.emit(MockStatus.Running(wgs.copy(coordType = CoordType.WGS84), System.currentTimeMillis()))
+                    engine.push(wgs.toLocation())
+                    statusStore.emit(MockStatus.Running(wgs.copy(coordType = CoordType.WGS84), System.currentTimeMillis()))
                 }.onFailure {
-                    container.statusStore.emit(MockStatus.Error("注入失败：${it.message}"))
+                    statusStore.emit(MockStatus.Error("注入失败：${it.message}"))
                 }
                 delay(INJECT_INTERVAL_MS)
             }
@@ -81,8 +86,8 @@ class MockLocationService : LifecycleService() {
     private fun stopLoop() {
         loopJob?.cancel()
         scope.launch {
-            runCatching { container.engine.stopMockMode() }
-            container.statusStore.emit(MockStatus.Idle)
+            runCatching { engine.stopMockMode() }
+            statusStore.emit(MockStatus.Idle)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }

@@ -1,13 +1,11 @@
 package com.snake.mobilespoofing.ui
 
 import android.Manifest
-import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.snake.mobilespoofing.SpoofingApp
 import com.snake.mobilespoofing.core.data.FavoriteRepository
 import com.snake.mobilespoofing.core.location.MockPermissionChecker
 import com.snake.mobilespoofing.core.location.MockStatusStore
@@ -16,18 +14,24 @@ import com.snake.mobilespoofing.core.model.FavoriteItem
 import com.snake.mobilespoofing.core.model.GeoPoint
 import com.snake.mobilespoofing.domain.StartMockUseCase
 import com.snake.mobilespoofing.domain.StopMockUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val container = (application as SpoofingApp).container
-    private val favoriteRepository: FavoriteRepository = container.favoriteRepository
-    private val startMockUseCase: StartMockUseCase = container.startMockUseCase
-    private val stopMockUseCase: StopMockUseCase = container.stopMockUseCase
-    private val statusStore: MockStatusStore = container.statusStore
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val favoriteRepository: FavoriteRepository,
+    private val startMockUseCase: StartMockUseCase,
+    private val stopMockUseCase: StopMockUseCase,
+    private val statusStore: MockStatusStore,
+    private val permissionChecker: MockPermissionChecker,
+    @ApplicationContext private val appContext: Context,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -63,7 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 searchResults = emptyList(),
-                message = "当前构建未集成高德 Search SDK，请在地图上点选位置"
+                message = "当前构建未集成高德 Search SDK，请在地图上点选位置",
             )
         }
     }
@@ -113,9 +117,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshCapabilities() {
-        val context = getApplication<Application>()
-        val hasLocationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val canMock = MockPermissionChecker(context).canMockLocation()
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val canMock = permissionChecker.canMockLocation()
         _uiState.update { it.copy(permissionGranted = hasLocationPermission, canMock = canMock) }
     }
 
@@ -139,5 +145,3 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
-
-

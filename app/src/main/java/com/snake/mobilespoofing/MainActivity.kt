@@ -66,7 +66,11 @@ import com.snake.mobilespoofing.core.model.FavoriteItem
 import com.snake.mobilespoofing.core.model.MockStatus
 import com.snake.mobilespoofing.ui.MainViewModel
 import com.snake.mobilespoofing.ui.SearchResultItem
+import dagger.hilt.android.AndroidEntryPoint
 
+// Required for @HiltViewModel to resolve. Without it the mismatch is a *runtime* crash
+// ("does not implement interface GeneratedComponentManager"), not a compile error.
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
 

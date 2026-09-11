@@ -2,6 +2,8 @@ package com.snake.mobilespoofing.core.location
 
 import android.location.Location
 import com.google.android.gms.location.FusedLocationProviderClient
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -18,7 +20,8 @@ interface MockLocationEngine {
 }
 
 /** Injects through Google's FusedLocationProviderClient. */
-class FusedMockLocationEngine(
+@Singleton
+class FusedMockLocationEngine @Inject constructor(
     private val fusedLocationProviderClient: FusedLocationProviderClient,
 ) : MockLocationEngine {
 

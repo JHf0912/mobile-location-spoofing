@@ -4,6 +4,9 @@ import android.app.AppOpsManager
 import android.content.Context
 import android.os.Build
 import android.os.Process
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Answers whether this app is currently the system's selected mock-location app.
@@ -12,7 +15,10 @@ import android.os.Process
  * can change at any time while the app is backgrounded — re-check it before starting a session
  * rather than trusting a value captured when the screen was rendered.
  */
-class MockPermissionChecker(private val context: Context) {
+@Singleton
+class MockPermissionChecker @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
 
     fun canMockLocation(): Boolean {
         val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
