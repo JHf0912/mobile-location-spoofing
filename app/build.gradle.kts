@@ -7,20 +7,30 @@ plugins {
 }
 
 /**
- * Reads a value from, in order: Gradle properties (-P / gradle.properties), then
- * local.properties, then the environment.
+ * Resolves the AMap key from, in order: -P / gradle.properties, local.properties, the environment.
  *
- * local.properties matters here because Gradle does NOT load it into project properties — only
- * AGP reads it, and only for sdk.dir/ndk.dir. Calling findProperty() alone therefore silently
- * misses anything a contributor put there.
+ * Two things here are deliberate:
+ *
+ *  - local.properties is read explicitly, because Gradle does NOT load it into project properties.
+ *    Only AGP reads that file, and only for sdk.dir/ndk.dir — so a bare findProperty() silently
+ *    misses anything a contributor put there, which is exactly the bug this replaced.
+ *
+ *  - it is read through the Provider API so the configuration cache registers the file as an
+ *    input. A plain File read is not tracked: the cached configuration would outlive an edit to
+ *    the key and the build would keep injecting the stale value with no warning at all.
  */
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
+val localPropertiesKey: Provider<String> =
+    providers.fileContents(rootProject.layout.projectDirectory.file("local.properties"))
+        .asText
+        .map { text ->
+            Properties().apply { load(text.reader()) }.getProperty("AMAP_API_KEY").orEmpty()
+        }
 
-fun configValue(key: String): String? =
-    (findProperty(key) as String?) ?: localProperties.getProperty(key) ?: System.getenv(key)
+val amapKey: String? = listOf(
+    providers.gradleProperty("AMAP_API_KEY"),
+    localPropertiesKey,
+    providers.environmentVariable("AMAP_API_KEY"),
+).firstNotNullOfOrNull { it.orNull?.takeIf(String::isNotBlank) }
 
 // Signing material lives in a git-ignored file. Absent on a fresh clone and in CI without
 // secrets, in which case the release build simply stays unsigned instead of failing to configure.
@@ -29,7 +39,6 @@ val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
 }
 
-val amapKey = configValue("AMAP_API_KEY")
 if (amapKey.isNullOrBlank()) {
     logger.warn(
         "AMAP_API_KEY is not set. The build will succeed, but the map will fail to render at " +
