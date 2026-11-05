@@ -91,9 +91,9 @@ class AndroidCurrentLocationSource @Inject constructor(
                     provider,
                     signal,
                     ContextCompat.getMainExecutor(context),
-                ) { location -> continuation.resume(location) }
+                ) { location -> if (continuation.isActive) continuation.resume(location) }
             }.onFailure {
-                continuation.resume(null)
+                if (continuation.isActive) continuation.resume(null)
             }
         }
 
