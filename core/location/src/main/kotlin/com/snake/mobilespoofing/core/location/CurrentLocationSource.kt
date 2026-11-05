@@ -1,6 +1,7 @@
 package com.snake.mobilespoofing.core.location
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
@@ -60,6 +61,9 @@ class AndroidCurrentLocationSource @Inject constructor(
     private fun isEnabled(manager: LocationManager, provider: String): Boolean =
         runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false)
 
+    // Safe: current() returns early unless hasLocationPermission() is true, and providers is only
+    // built after that guard. Lint cannot see across the call, so the check is stated explicitly.
+    @SuppressLint("MissingPermission")
     private fun lastKnown(manager: LocationManager, providers: List<String>): GeoPoint? =
         providers
             .mapNotNull { provider ->
@@ -76,6 +80,7 @@ class AndroidCurrentLocationSource @Inject constructor(
         return null
     }
 
+    @SuppressLint("MissingPermission")
     private suspend fun awaitCurrent(manager: LocationManager, provider: String): Location? =
         suspendCancellableCoroutine { continuation ->
             val signal = CancellationSignal()
