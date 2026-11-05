@@ -43,12 +43,13 @@ class FavoriteRepository @Inject constructor(private val dao: FavoriteDao) {
 }
 
 /**
- * Deliberately forgiving.
+ * Deliberately forgiving about the *value*, but not about the datum.
  *
  * `CoordType.valueOf` throws on an unrecognised string, and this runs inside a `Flow.map` — so a
  * single corrupt row would terminate the favorites stream permanently and silently, leaving the
- * UI stuck on stale data with no error surfaced anywhere. Falling back to the app's default datum
- * degrades one row instead of the whole list.
+ * UI stuck on stale data with no error surfaced anywhere. The database's canonical datum is WGS84
+ * (see [save]), so an unknown string is treated as WGS84; the old GCJ02 fallback shifted the
+ * position by hundreds of metres when the row was injected.
  */
 internal fun parseCoordType(raw: String?): CoordType =
-    CoordType.entries.firstOrNull { it.name == raw } ?: CoordType.GCJ02
+    CoordType.entries.firstOrNull { it.name == raw } ?: CoordType.WGS84

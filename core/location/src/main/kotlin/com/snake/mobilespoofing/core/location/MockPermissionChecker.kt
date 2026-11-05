@@ -12,15 +12,22 @@ import javax.inject.Singleton
  * Answers whether this app is currently the system's selected mock-location app.
  *
  * That is an AppOps setting the user changes in Developer Options, not a runtime permission, so it
- * can change at any time while the app is backgrounded — re-check it before starting a session
- * rather than trusting a value captured when the screen was rendered.
+ * can change at any time while the app is backgrounded — re-check it before starting a session and
+ * periodically during one rather than trusting a value captured when the screen was rendered.
+ *
+ * An interface so the runner and the LocationManager engine can be tested on the JVM without a
+ * device; [AndroidMockPermissionChecker] is the production binding.
  */
-@Singleton
-class MockPermissionChecker @Inject constructor(
-    @ApplicationContext private val context: Context,
-) {
+fun interface MockPermissionChecker {
+    fun canMockLocation(): Boolean
+}
 
-    fun canMockLocation(): Boolean {
+@Singleton
+class AndroidMockPermissionChecker @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : MockPermissionChecker {
+
+    override fun canMockLocation(): Boolean {
         val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             appOpsManager.unsafeCheckOpNoThrow(

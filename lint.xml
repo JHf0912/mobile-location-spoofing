@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      NewerVersionAvailable resolves the latest version of every dependency from Google's Maven
+      index over the network. CI must stay hermetic and reproducible, so the check is disabled
+      rather than left to network conditions. Enable it deliberately (for example in a scheduled
+      dependency-update job) when that is the intent.
+    -->
+    <issue id="NewerVersionAvailable" severity="ignore" />
+</lint>

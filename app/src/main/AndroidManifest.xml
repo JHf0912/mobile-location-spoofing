@@ -1,12 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!--
+      Never granted to a normal app (signature level), but declaring it is what creates the AppOps
+      entry that makes this app appear in Settings → Developer options → Select mock location app.
+      Without it the picker lists every mock-location app except this one, so the setup checklist
+      can never go green. Lint's "debug only" advice does not apply: injecting mock locations is
+      this app's entire purpose, in release as well.
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Keeps the CPU awake while a session is injecting; a foreground service alone does not. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Required by Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS in MainActivity. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
       Package visibility. Without this, resolveActivity() returns null on API 30+ even for these
@@ -32,6 +47,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MobileLocationSpoofing">

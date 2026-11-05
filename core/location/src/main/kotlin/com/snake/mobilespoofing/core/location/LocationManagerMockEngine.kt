@@ -1,15 +1,11 @@
 package com.snake.mobilespoofing.core.location
 
-import android.content.Context
-import android.location.Criteria
 import android.location.LocationManager
-import android.location.provider.ProviderProperties
-import android.os.Build
 import com.snake.mobilespoofing.core.model.Fix
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.delay
 
 /**
  * Injects through `LocationManager` test providers.
@@ -18,32 +14,67 @@ import kotlin.coroutines.cancellation.CancellationException
  * than through Google's fused client — a gap that made the tool silently do nothing for them.
  *
  * ⚠️ Test providers are registered with the *system*, not with this process. If the app is killed
- * without `stopMockMode`, the device keeps reporting a mock position to every app on it, and the
- * only recovery is a reboot or another mock-location app clearing it. Every path that can leave
- * this class — including a crash — must therefore go through [stopMockMode], and [startMockMode]
- * clears leftovers before it registers anything.
+ * without `stopMockMode`, the device keeps reporting a mock position to every app on it. The
+ * persisted [ProviderLeaseStore] plus the cold-start cleanup are the only recovery for that case;
+ * every path that can leave this class must therefore go through [stopMockMode].
+ *
+ * The lease is written for a provider before it is added, so a process death between the two
+ * cannot leave an untracked provider behind. That write is the only part of the critical section
+ * that holds [ProviderLeaseStore.withLeaseLock] — the `LocationManager` call itself is not nested
+ * inside the lock, because the lock is not reentrant.
  */
 @Singleton
 class LocationManagerMockEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val providerController: MockProviderController,
+    private val permissionChecker: MockPermissionChecker,
+    private val leaseStore: ProviderLeaseStore,
 ) : MockLocationEngine {
 
-    private val locationManager: LocationManager
-        get() = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    /**
+     * Providers that `addProvider` succeeded on and that therefore may be registered with the
+     * system. Added *before* enabling, so a failure in `setProviderEnabled` cannot leave an
+     * untracked provider behind.
+     */
+    private val touched = mutableSetOf<String>()
 
-    private val registered = mutableSetOf<String>()
+    /** Providers that are registered and enabled, i.e. the ones a fix can be pushed to. */
+    private val enabled = mutableSetOf<String>()
 
-    override suspend fun startMockMode() {
+    override suspend fun startMockMode(sessionId: Long): EngineStartOutcome {
         val problems = mutableListOf<String>()
+        var leaseFailure: String? = null
 
-        PROVIDERS.forEach { provider ->
+        for (provider in PROVIDERS) {
+            // Always remove first. A provider left over from a previous run — or from a crash —
+            // makes addTestProvider throw, and this is the only place that can clear it.
+            removeProviderQuietly(provider)
+
+            // Lease-before-add: the durable write must succeed before the provider exists
+            // system-wide. The lock covers only the write, never the registration below.
+            val leased = try {
+                leaseStore.withLeaseLock {
+                    leaseStore.acquire(sessionId, listOf(provider))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                leaseFailure = "lease write failed: ${e.message}"
+                break
+            }
+            if (!leased) {
+                // I1: no durable lease, no provider registration. Anything already registered by
+                // this start is rolled back below.
+                leaseFailure = "lease write failed"
+                break
+            }
+
             try {
-                // Always remove first. A provider left over from a previous run — or from a crash —
-                // makes addTestProvider throw, and this is the only place that can clear it.
-                removeTestProviderQuietly(provider)
-                addTestProvider(provider)
-                locationManager.setTestProviderEnabled(provider, true)
-                registered += provider
+                providerController.addProvider(provider)
+                // Track immediately: from here on the provider exists system-wide, even if the
+                // enable call below fails. Teardown must remove it either way.
+                touched += provider
+                providerController.setProviderEnabled(provider, true)
+                enabled += provider
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SecurityException) {
@@ -52,91 +83,185 @@ class LocationManagerMockEngine @Inject constructor(
             } catch (e: IllegalArgumentException) {
                 // The provider name is already taken, or is not one this device supports.
                 problems += "$provider: provider unavailable (${e.message})"
-            } catch (e: RuntimeException) {
+            } catch (e: Exception) {
                 problems += "$provider: ${e::class.simpleName}: ${e.message}"
             }
         }
 
-        if (registered.isEmpty()) {
-            error("No location provider could be mocked. ${problems.joinToString("; ")}")
+        if (leaseFailure != null) {
+            // Do not leave a provider registered without the durable lease that would let a later
+            // process find it. Providers this start already registered are removed now.
+            removeTouchedProviders()
+            return EngineStartOutcome.Failed(leaseFailure)
+        }
+
+        // `enabled` rather than `touched`: a provider that was added but could not be enabled
+        // cannot accept fixes, so a session with only those must fail rather than pretend to run.
+        return if (enabled.isEmpty()) {
+            EngineStartOutcome.Failed(problems.joinToString("; "))
+        } else {
+            EngineStartOutcome.Ok
         }
     }
 
-    override suspend fun push(fix: Fix) {
-        val failures = mutableListOf<String>()
-        registered.forEach { provider ->
+    override suspend fun push(fix: Fix): EnginePushOutcome {
+        if (touched.isEmpty()) return EnginePushOutcome.AllRejected
+
+        // A single failed push is a warning, not a session failure — one provider being flaky must
+        // not stop the others from moving. Any delivery counts as success for this engine.
+        if (pushToEnabled(fix)) return EnginePushOutcome.Ok
+
+        // Every enabled provider rejected the fix (or none is enabled any more). A provider can
+        // be removed or taken over by another mock app at any time; try to re-register once with a
+        // bounded backoff, then deliver the current fix if that recovered anything.
+        reregisterProviders(touched.toList())
+        return if (pushToEnabled(fix)) EnginePushOutcome.Ok else EnginePushOutcome.AllRejected
+    }
+
+    override suspend fun stopMockMode(): List<ProviderStopResult> = removeTouchedProviders()
+
+    /**
+     * Removes every provider this engine may have registered and releases the lease for the ones
+     * confirmed gone.
+     *
+     * `touched`, not `enabled`: a provider that was added but never enabled still exists in the
+     * system and must be removed. Runs even when [startMockMode] only partially succeeded, which
+     * is exactly when a leftover provider is most likely.
+     */
+    private suspend fun removeTouchedProviders(): List<ProviderStopResult> {
+        val results = touched.toList().map { provider -> stopProvider(provider) }
+        val removed = results.filter { it.removed }.map { it.provider }
+
+        // A stopped session must not keep pushing, regardless of whether the lease write succeeds.
+        enabled.clear()
+        if (removed.isEmpty()) return results
+
+        // Only a confirmed removal may clear the lease. SecurityException means the provider may
+        // still be registered, so the lease has to survive for the next cold start to retry.
+        val released = leaseStore.withLeaseLock {
+            leaseStore.release(removed)
+        }
+        if (released) {
+            touched.removeAll(removed.toSet())
+        }
+        // If the release commit failed, keep the providers in `touched`: the lease still names
+        // them on disk, so a later stop (or the next cold start) must retry the release.
+        return results
+    }
+
+    /**
+     * Removes providers recorded by a previous process without touching any engine state.
+     *
+     * Called by the cold-start cleanup. Does **not** release the lease itself: the caller decides,
+     * based on [ProviderStopResult.removed], which providers may be forgotten.
+     */
+    suspend fun clearStaleProviders(providers: Collection<String>): List<ProviderStopResult> {
+        val results = providers.map { provider -> stopProvider(provider) }
+        val removed = results.filter { it.removed }.map { it.provider }.toSet()
+        touched.removeAll(removed)
+        enabled.removeAll(removed)
+        return results
+    }
+
+    // ---------------------------------------------------------------- push & re-registration
+
+    private fun pushToEnabled(fix: Fix): Boolean {
+        val providers = enabled.toList()
+        if (providers.isEmpty()) return false
+
+        var delivered = 0
+        providers.forEach { provider ->
             try {
-                // A fresh Location per provider: API 31+ rejects a test location that is not
-                // "complete", and each provider needs its own name stamped on it.
-                locationManager.setTestProviderLocation(provider, fix.toLocation(provider))
+                providerController.setProviderLocation(provider, fix)
+                delivered++
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: RuntimeException) {
-                failures += "$provider: ${e.message}"
+            } catch (_: Exception) {
+                // Partial failure is tolerated; only "nothing was delivered" is reported.
             }
         }
-        // A single failed push is a warning, not a session failure — one provider being flaky must
-        // not stop the others from moving.
-        if (registered.isNotEmpty() && failures.size == registered.size) {
-            error("all providers rejected the fix. ${failures.joinToString("; ")}")
-        }
+        return delivered > 0
     }
 
-    override suspend fun stopMockMode() {
-        // Runs even when startMockMode only partially succeeded, which is exactly when a leftover
-        // provider is most likely.
-        registered.toList().forEach { provider ->
-            setTestProviderEnabledQuietly(provider)
-            removeTestProviderQuietly(provider)
+    /**
+     * Re-registers the providers that were lost, bounded to fit inside the composite's per-push
+     * budget.
+     *
+     * The AppOp is re-checked first: if it was revoked, re-registering would only produce a storm
+     * of failed binder calls and each tick would report a failure anyway. The runner terminates the
+     * session after five consecutive failed pushes.
+     *
+     * The 100ms/500ms backoff steps are used; the design's 2s step is deliberately omitted because
+     * a third retry after 2s would outlive the 1.5s per-push timeout and be cancelled mid-way,
+     * leaving the bookkeeping half-applied.
+     */
+    private suspend fun reregisterProviders(targets: List<String>) {
+        if (targets.isEmpty() || !permissionChecker.canMockLocation()) return
+
+        repeat(REREGISTRATION_ATTEMPTS) { attempt ->
+            if (attempt > 0) delay(REREGISTRATION_BACKOFF_MS[attempt - 1])
+
+            val recovered = mutableSetOf<String>()
+            targets.forEach { provider ->
+                try {
+                    removeProviderQuietly(provider)
+                    providerController.addProvider(provider)
+                    providerController.setProviderEnabled(provider, true)
+                    recovered += provider
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Try again after the backoff while attempts remain.
+                }
+            }
+
+            enabled.clear()
+            enabled.addAll(recovered)
+            if (recovered.size == targets.size) return
         }
-        registered.clear()
     }
 
     // ---------------------------------------------------------------- provider plumbing
 
-    private fun addTestProvider(provider: String) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val properties = ProviderProperties.Builder()
-                .setHasAltitudeSupport(true)
-                .setHasSpeedSupport(true)
-                .setHasBearingSupport(true)
-                .setPowerUsage(ProviderProperties.POWER_USAGE_HIGH)
-                .setAccuracy(ProviderProperties.ACCURACY_FINE)
-                .build()
-            locationManager.addTestProvider(provider, properties)
-        } else {
-            // The single modern overload only exists from API 31. Everything older needs this one.
-            @Suppress("DEPRECATION")
-            locationManager.addTestProvider(
-                provider,
-                /* requiresNetwork = */ false,
-                /* requiresSatellite = */ true,
-                /* requiresCell = */ false,
-                /* hasMonetaryCost = */ false,
-                /* supportsAltitude = */ true,
-                /* supportsSpeed = */ true,
-                /* supportsBearing = */ true,
-                Criteria.POWER_HIGH,
-                Criteria.ACCURACY_FINE,
-            )
+    private fun stopProvider(provider: String): ProviderStopResult {
+        setProviderEnabledQuietly(provider)
+        return try {
+            providerController.removeProvider(provider)
+            ProviderStopResult(provider, removed = true, reason = null)
+        } catch (e: IllegalArgumentException) {
+            // Nothing registered under that name, which is the desired state anyway.
+            ProviderStopResult(provider, removed = true, reason = "already absent")
+        } catch (e: SecurityException) {
+            // Permission was revoked mid-session. The provider may remain until the user grants it
+            // again or reboots; the lease stays so a later cold start retries.
+            ProviderStopResult(provider, removed = false, reason = "security: ${e.message}")
+        } catch (e: Exception) {
+            ProviderStopResult(provider, removed = false, reason = e.message ?: e::class.simpleName)
         }
     }
 
-    private fun removeTestProviderQuietly(provider: String) {
+    private fun removeProviderQuietly(provider: String) {
         try {
-            locationManager.removeTestProvider(provider)
+            providerController.removeProvider(provider)
         } catch (_: IllegalArgumentException) {
             // Nothing registered under that name, which is the desired state anyway.
+        } catch (_: SecurityException) {
+            // Permission was revoked mid-session. Letting this abort the loop would leave the other
+            // provider even harder to clean up.
+        } catch (_: Exception) {
+            // Best effort; the add below reports the failure if the provider is still occupied.
         }
     }
 
-    private fun setTestProviderEnabledQuietly(provider: String) {
+    private fun setProviderEnabledQuietly(provider: String) {
         try {
-            locationManager.setTestProviderEnabled(provider, false)
+            providerController.setProviderEnabled(provider, false)
         } catch (_: IllegalArgumentException) {
             // Already gone.
         } catch (_: SecurityException) {
-            // Permission was revoked mid-session; removeTestProvider below still cleans up.
+            // Permission was revoked mid-session; removal below still does what it can.
+        } catch (_: Exception) {
+            // Best effort.
         }
     }
 
@@ -149,5 +274,8 @@ class LocationManagerMockEngine @Inject constructor(
             LocationManager.GPS_PROVIDER,
             LocationManager.NETWORK_PROVIDER,
         )
+
+        private const val REREGISTRATION_ATTEMPTS = 3
+        private val REREGISTRATION_BACKOFF_MS = longArrayOf(100L, 500L)
     }
 }

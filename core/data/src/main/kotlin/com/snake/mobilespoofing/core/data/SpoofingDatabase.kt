@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [FavoriteLocationEntity::class],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class SpoofingDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao

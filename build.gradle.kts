@@ -20,6 +20,9 @@ tasks.register("verify") {
     dependsOn(":app:assembleDebug")
 
     subprojects.forEach { sub ->
+        sub.plugins.withId("com.android.application") {
+            dependsOn("${sub.path}:testDebugUnitTest")
+        }
         sub.plugins.withId("com.android.library") {
             dependsOn("${sub.path}:testDebugUnitTest")
         }

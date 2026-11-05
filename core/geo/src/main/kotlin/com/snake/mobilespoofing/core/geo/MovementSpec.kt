@@ -19,9 +19,10 @@ sealed interface MovementSpec {
         val endBehavior: EndBehavior,
         /**
          * Whether the ring is closed by returning to the first waypoint. Meaningful for
-         * [EndBehavior.LOOP]; ignored otherwise.
+         * [EndBehavior.LOOP]; ignored otherwise. Defaults to false so a caller that forgets it
+         * cannot make a STOP route end at the first waypoint instead of the last.
          */
-        val closedLoop: Boolean = true,
+        val closedLoop: Boolean = false,
     ) : MovementSpec
 }
 

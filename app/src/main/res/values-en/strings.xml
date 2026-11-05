@@ -1,0 +1,139 @@
+<resources>
+    <string name="app_name">Mock Location Tool</string>
+    <string name="app_tagline">Developer location testing</string>
+
+    <!-- Status -->
+    <string name="status_idle">Idle</string>
+    <string name="status_starting">Starting</string>
+    <string name="status_running">Running</string>
+    <string name="status_degraded">Degraded</string>
+    <string name="status_stopping">Stopping</string>
+    <string name="status_error">Error</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_not_started">Not started</string>
+    <string name="status_mode_static">Static</string>
+    <string name="status_mode_route">Route</string>
+    <string name="status_elapsed">Running %1$s</string>
+    <string name="status_waypoints">%1$d waypoints</string>
+    <string name="value_dash">—</string>
+    <string name="hero_overline">Current mock location</string>
+
+    <!-- Sections -->
+    <string name="section_location">Location</string>
+    <string name="section_location_hint_static">Tap the map to set a mock coordinate</string>
+    <string name="section_location_hint_route">Tap the map to add waypoints in order</string>
+    <string name="section_route">Route</string>
+    <string name="section_setup">Setup</string>
+    <string name="section_setup_hint">Complete these in order</string>
+    <string name="section_favorites">Favorites</string>
+
+    <!-- Mode -->
+    <string name="mode_static">Static</string>
+    <string name="mode_route">Route</string>
+
+    <!-- Map -->
+    <string name="map_dialog_title">Pick a location</string>
+    <string name="map_dialog_done">Done</string>
+    <string name="map_dialog_hint">Tap the map to add a location · keep tapping in route mode</string>
+    <string name="map_preview_label">Map preview</string>
+    <string name="map_unavailable">Map unavailable on this device</string>
+    <string name="map_consent_title">Map privacy</string>
+    <string name="map_consent_body">The map is provided by AMap. Please read and accept the AMap privacy policy before the map loads.</string>
+    <string name="map_consent_agree">Agree and load map</string>
+    <string name="map_consent_policy">View policy</string>
+
+    <!-- Coordinate input -->
+    <string name="coordinate_label">Coordinate (WGS84)</string>
+    <string name="coordinate_hint">39.9042, 116.4074 or geo:39.9042,116.4074</string>
+    <string name="coordinate_apply">Apply</string>
+
+    <!-- Route -->
+    <string name="route_waypoints">%1$d waypoints</string>
+    <string name="route_undo">Undo</string>
+    <string name="route_clear">Clear</string>
+    <string name="route_speed">Speed</string>
+    <string name="route_end_behavior">At the end</string>
+    <string name="route_end_stop">Stop</string>
+    <string name="route_end_loop">Loop</string>
+    <string name="route_end_pingpong">Ping-pong</string>
+    <string name="speed_walking">Walking</string>
+    <string name="speed_running">Running</string>
+    <string name="speed_cycling">Cycling</string>
+    <string name="speed_driving">Driving</string>
+    <string name="speed_chip">%1$s %2$d</string>
+
+    <!-- Setup checklist -->
+    <string name="setup_location">Location permission</string>
+    <string name="setup_location_done">Granted</string>
+    <string name="setup_location_todo">Grant</string>
+    <string name="setup_mock_app">Mock location app</string>
+    <string name="setup_mock_app_done">Selected</string>
+    <string name="setup_mock_app_todo">Open developer options</string>
+    <string name="setup_battery">Battery optimization</string>
+    <string name="setup_battery_done">Exempt</string>
+    <string name="setup_battery_todo">Open settings</string>
+    <string name="setup_notifications">Notifications</string>
+    <string name="setup_notifications_done">Allowed</string>
+    <string name="setup_notifications_todo">Open settings</string>
+    <string name="setup_open">Open settings</string>
+
+    <!-- Favorites -->
+    <string name="favorites_empty">No favorites yet — pick a point and save it</string>
+    <string name="favorite_name_hint">Favorite name</string>
+    <string name="favorite_save">Save</string>
+    <string name="favorite_delete">Delete favorite</string>
+    <string name="favorite_unnamed">Unnamed favorite</string>
+
+    <!-- Primary actions -->
+    <string name="action_start">Start mock</string>
+    <string name="action_stop">Stop mock</string>
+
+    <!-- Messages -->
+    <string name="msg_select_point">Pick a point on the map first</string>
+    <string name="msg_route_too_short">A route needs at least %1$d waypoints</string>
+    <string name="msg_permission_required">Grant location permission first</string>
+    <string name="msg_mock_app_required">Select this app as the mock location app in Developer options</string>
+    <string name="msg_already_running">A mock session is already running</string>
+    <string name="msg_favorite_saved">Saved to favorites</string>
+    <string name="msg_route_favorite_unsupported">Routes cannot be favorited yet — switch to Static</string>
+    <string name="msg_save_failed">Could not save: %1$s</string>
+    <string name="msg_delete_failed">Could not delete: %1$s</string>
+    <string name="msg_load_favorites_failed">Could not load favorites: %1$s</string>
+    <string name="msg_coordinate_empty">Enter a coordinate</string>
+    <string name="msg_coordinate_malformed">Invalid coordinate — use lat,lon or geo:lat,lon</string>
+    <string name="msg_coordinate_out_of_range">Coordinate out of range: latitude -90..90, longitude -180..180</string>
+    <string name="msg_coordinate_not_finite">Coordinate must be a finite number</string>
+    <string name="msg_route_full">Route waypoint limit reached: %1$d</string>
+    <string name="msg_teardown_in_progress">The previous session is still cleaning up — try again shortly</string>
+    <!-- Session phases: degraded and error reasons -->
+    <string name="reason_degraded_push_rejected">Location injection was rejected</string>
+    <string name="reason_degraded_permission_revoked">Mock location permission was revoked</string>
+    <string name="reason_degraded_provider_conflict">Another app is using the location provider</string>
+    <string name="reason_degraded_engine_timeout">The mock engine timed out</string>
+    <string name="reason_error_missing_spec">No location selected</string>
+    <string name="reason_error_permission_denied">Location permission is missing</string>
+    <string name="reason_error_mock_app_not_selected">This app is not selected as the mock location app</string>
+    <string name="reason_error_engine_start_failed">The mock engine failed to start</string>
+    <string name="reason_error_source_invalid">The simulation route is invalid</string>
+    <string name="reason_error_too_many_consecutive_failures">Too many consecutive injection failures</string>
+    <string name="reason_error_service_start_failed">The mock service failed to start</string>
+    <string name="reason_error_teardown_timeout">The previous session did not finish cleaning up</string>
+    <string name="reason_error_unknown">Unknown error</string>
+
+    <!-- Foreground service -->
+    <string name="notification_channel">Mock location</string>
+    <string name="notification_running">Mocking location</string>
+    <string name="notification_degraded">Mock degraded: %1$s</string>
+    <string name="notification_stopping">Stopping mock</string>
+    <string name="notification_error">Mock failed: %1$s</string>
+
+    <!-- Quick Settings tile -->
+    <string name="tile_subtitle_idle">Not mocking</string>
+    <string name="tile_subtitle_running">Mocking</string>
+    <string name="tile_subtitle_degraded">Degraded</string>
+    <string name="tile_subtitle_stopping">Stopping</string>
+    <string name="tile_permission_required">Grant location permission first</string>
+    <string name="tile_mock_app_required">Select this app as the mock location app first</string>
+    <string name="tile_start_failed">Could not start mock: %1$s</string>
+    <string name="tile_stop_failed">Could not stop mock: %1$s</string>
+</resources>

@@ -18,7 +18,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "MobileLocationSpoofing"
 
-// Dependency direction is one-way: :app -> :core:* and (location|data) -> geo -> model.
+// Dependency direction is one-way: :app -> :core:*; :core:location -> {:core:geo, :core:model};
+// :core:geo -> :core:model; and :core:data -> :core:model (not :core:geo).
 // :core:model and :core:geo are pure JVM (no Android plugin), so the compiler itself enforces
 // that they stay free of android.* imports.
 include(":app")

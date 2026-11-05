@@ -13,7 +13,7 @@ dependencies {
     api(project(":core:geo"))
 
     implementation(libs.google.play.services.location)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.androidx.lifecycle.service)
 }
