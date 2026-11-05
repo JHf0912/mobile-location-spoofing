@@ -38,6 +38,15 @@
         <intent>
             <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
         </intent>
+        <!-- Used by openNotificationSettings(): without this, resolveActivity() returns null on
+             API 30+ and the app falls through to the app-details page instead of notification settings. -->
+        <intent>
+            <action android:name="android.settings.APP_NOTIFICATION_SETTINGS" />
+        </intent>
+        <!-- Used as the fallback target of every settings jump; declared so it is always resolvable. -->
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+        </intent>
     </queries>
 
     <application
