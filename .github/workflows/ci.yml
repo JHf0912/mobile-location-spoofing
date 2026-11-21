@@ -24,7 +24,7 @@ jobs:
       # Verifies the wrapper jar matches the checksum published in gradle-wrapper.properties,
       # so a tampered wrapper cannot run in CI.
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -33,7 +33,7 @@ jobs:
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # No AMAP_API_KEY in CI. The build prints a warning and still succeeds — which is the point:
       # a missing map key must not be able to block an unrelated change.
