@@ -42,7 +42,7 @@ object CoordinateTransformer {
     // ---------------------------------------------------------------- GCJ02
 
     fun wgsToGcj(point: GeoPoint): GeoPoint {
-        if (outOfChina(point.latitude, point.longitude)) {
+        if (skipOffset(point.latitude, point.longitude)) {
             return point.copy(coordType = CoordType.GCJ02)
         }
         val (lat, lng) = forwardOffset(point.latitude, point.longitude)
@@ -57,7 +57,7 @@ object CoordinateTransformer {
      * the difference between the correct side of a street and the wrong one.
      */
     fun gcjToWgs(point: GeoPoint): GeoPoint {
-        if (outOfChina(point.latitude, point.longitude)) {
+        if (skipOffset(point.latitude, point.longitude)) {
             return point.copy(coordType = CoordType.WGS84)
         }
         var lat = point.latitude
@@ -88,7 +88,7 @@ object CoordinateTransformer {
     fun bdToGcj(point: GeoPoint): GeoPoint {
         // Same guard as the GCJ02 path: outside China the datums coincide, and applying the
         // offset would move a point that is already correct.
-        if (outOfChina(point.latitude, point.longitude)) {
+        if (skipOffset(point.latitude, point.longitude)) {
             return point.copy(coordType = CoordType.GCJ02)
         }
         val x = point.longitude - 0.0065
@@ -99,7 +99,7 @@ object CoordinateTransformer {
     }
 
     fun gcjToBd(point: GeoPoint): GeoPoint {
-        if (outOfChina(point.latitude, point.longitude)) {
+        if (skipOffset(point.latitude, point.longitude)) {
             return point.copy(coordType = CoordType.BD09)
         }
         val x = point.longitude
@@ -128,6 +128,14 @@ object CoordinateTransformer {
         ret += (150.0 * sin(lng / 12.0 * PI) + 300.0 * sin(lng / 30.0 * PI)) * 2.0 / 3.0
         return ret
     }
+
+    /**
+     * Whether the datum offset should be skipped. Two reasons: outside China the datums coincide,
+     * and a non-finite coordinate is not a position — running the transform kernels on NaN/Infinity
+     * would turn one bad value into two and corrupt the finite companion.
+     */
+    private fun skipOffset(lat: Double, lng: Double): Boolean =
+        outOfChina(lat, lng) || !lat.isFinite() || !lng.isFinite()
 
     private fun outOfChina(lat: Double, lng: Double): Boolean =
         lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271

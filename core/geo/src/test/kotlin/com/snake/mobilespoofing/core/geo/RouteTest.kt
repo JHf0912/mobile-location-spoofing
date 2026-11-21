@@ -103,4 +103,10 @@ class RouteTest {
         val last = route.waypointsWgs84.last()
         assertEquals(0.0, GeoMath.haversineDistanceMeters(last, end.point), 0.5)
     }
+
+    @Test
+    fun `positionAt negative infinity clamps to the start`() {
+        val route = routeOf(1000.0)
+        assertEquals(0.0, route.positionAt(Double.NEGATIVE_INFINITY).distanceIntoTrip, 1e-9)
+    }
 }

@@ -111,4 +111,23 @@ class RouteMovementSourceTest {
         assertEquals(10.0f, fix.speedMetersPerSecond, 1e-4f)
         assertEquals(90.0f, fix.bearingDegrees, 0.5f)
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `loop on an open route is rejected instead of teleporting back to the start`() {
+        // LOOP wraps the travelled distance modulo the route length; an open route has no closing
+        // leg, so the wrap would jump from the last waypoint straight back to the first.
+        RouteMovementSource(routeOf(1000.0), speedMetersPerSecond = 10.0, endBehavior = EndBehavior.LOOP)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `a loop route spec with closedLoop false is rejected`() {
+        val a = origin
+        val b = GeoMath.destination(a, bearingDeg = 90.0, distanceMeters = 1000.0)
+        MovementSpec.RouteSpec(
+            waypointsWgs84 = listOf(a, b),
+            speedMetersPerSecond = 10.0,
+            endBehavior = EndBehavior.LOOP,
+            closedLoop = false,
+        ).toMovementSource()
+    }
 }

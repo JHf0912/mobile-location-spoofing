@@ -173,3 +173,38 @@ private fun ComponentsDarkPreview() {
         }
     }
 }
+
+@Preview(name = "Live diagnostics", showBackground = true, widthDp = 360, heightDp = 420)
+@Composable
+private fun LiveDiagnosticsPreview() {
+    MockLocationTheme {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            LiveDiagnosticsCard(
+                state = MainUiState(
+                    selectedPoint = point,
+                    permissionGranted = true,
+                    canMock = true,
+                    session = SessionState.Running(
+                        sessionId = 1L,
+                        sessionEpochElapsedMs = 1_000L,
+                        lastPointWgs84 = point,
+                    ),
+                ),
+            )
+            LiveDiagnosticsCard(
+                state = MainUiState(
+                    permissionGranted = true,
+                    canMock = false,
+                    session = SessionState.Error(
+                        sessionId = 1L,
+                        reason = SessionErrorReason.EngineStartFailed,
+                    ),
+                ),
+            )
+            BoundaryNote()
+        }
+    }
+}

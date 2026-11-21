@@ -72,13 +72,18 @@ class AndroidCurrentLocationSource @Inject constructor(
             .maxByOrNull { it.time }
             ?.let(::toGeoPoint)
 
-    private suspend fun requestFresh(manager: LocationManager, providers: List<String>): GeoPoint? {
-        for (provider in providers) {
-            val location = withTimeoutOrNull(FIX_TIMEOUT_MS) { awaitCurrent(manager, provider) }
-            if (location != null) return toGeoPoint(location)
+    private suspend fun requestFresh(manager: LocationManager, providers: List<String>): GeoPoint? =
+        // A per-provider timeout alone lets two providers run back-to-back for 2 × FIX_TIMEOUT_MS
+        // (~16s), which is far too long for a UI that only needs to seed a picker. The outer budget
+        // caps the whole acquisition: the first provider may use its full share, the rest get only
+        // what remains. A timeout here returns null (cached-seed miss), never a cancellation.
+        withTimeoutOrNull(TOTAL_FIX_TIMEOUT_MS) {
+            for (provider in providers) {
+                val location = withTimeoutOrNull(FIX_TIMEOUT_MS) { awaitCurrent(manager, provider) }
+                if (location != null) return@withTimeoutOrNull toGeoPoint(location)
+            }
+            null
         }
-        return null
-    }
 
     @SuppressLint("MissingPermission")
     private suspend fun awaitCurrent(manager: LocationManager, provider: String): Location? =
@@ -103,5 +108,8 @@ class AndroidCurrentLocationSource @Inject constructor(
     private companion object {
         val PROVIDERS = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
         const val FIX_TIMEOUT_MS = 8_000L
+
+        /** Overall budget for the whole fresh-acquisition attempt; caps the 2 × [FIX_TIMEOUT_MS] worst case. */
+        const val TOTAL_FIX_TIMEOUT_MS = 10_000L
     }
 }

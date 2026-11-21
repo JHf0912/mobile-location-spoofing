@@ -68,8 +68,14 @@ class LocationManagerMockEngine @Inject constructor(
                 break
             }
 
+            // `added` distinguishes "addProvider failed" from "setProviderEnabled failed": the
+            // former never registered anything system-wide, so the lease just written has no
+            // backing provider and is released below; the latter lands in `touched` and is rolled
+            // back on a failed start or removed on stop.
+            var added = false
             try {
                 providerController.addProvider(provider)
+                added = true
                 // Track immediately: from here on the provider exists system-wide, even if the
                 // enable call below fails. Teardown must remove it either way.
                 touched += provider
@@ -80,11 +86,14 @@ class LocationManagerMockEngine @Inject constructor(
             } catch (e: SecurityException) {
                 // The app is not the system's selected mock-location app.
                 problems += "$provider: not selected as the mock location app"
+                if (!added) releaseLeaseQuietly(listOf(provider))
             } catch (e: IllegalArgumentException) {
                 // The provider name is already taken, or is not one this device supports.
                 problems += "$provider: provider unavailable (${e.message})"
+                if (!added) releaseLeaseQuietly(listOf(provider))
             } catch (e: Exception) {
                 problems += "$provider: ${e::class.simpleName}: ${e.message}"
+                if (!added) releaseLeaseQuietly(listOf(provider))
             }
         }
 
@@ -98,6 +107,10 @@ class LocationManagerMockEngine @Inject constructor(
         // `enabled` rather than `touched`: a provider that was added but could not be enabled
         // cannot accept fixes, so a session with only those must fail rather than pretend to run.
         return if (enabled.isEmpty()) {
+            // Those providers were registered (addProvider succeeded), so a failed start must not
+            // leave a registered-but-disabled provider behind. Roll them back and release their
+            // lease, exactly like the lease-failure path.
+            removeTouchedProviders()
             EngineStartOutcome.Failed(problems.joinToString("; "))
         } else {
             EngineStartOutcome.Ok
@@ -147,6 +160,26 @@ class LocationManagerMockEngine @Inject constructor(
         // If the release commit failed, keep the providers in `touched`: the lease still names
         // them on disk, so a later stop (or the next cold start) must retry the release.
         return results
+    }
+
+    /**
+     * Releases the lease for providers that were acquired but never registered.
+     *
+     * Called when `addProvider` fails: the durable lease was written first (lease-before-add), but
+     * no provider backs it, so the entry must not survive to the next cold start. A failed release
+     * commit leaves the lease on disk for the next cold start to retry — best effort, never a
+     * start failure.
+     */
+    private suspend fun releaseLeaseQuietly(providers: Collection<String>) {
+        try {
+            leaseStore.withLeaseLock {
+                leaseStore.release(providers)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Best effort; a lease that could not be released now is retried by the next cold start.
+        }
     }
 
     /**

@@ -13,13 +13,15 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * Serializes cold-start provider cleanup against a service start.
  *
- * There are two different locks here and they must not be nested:
+ * There are two locks here with a one-way order that cannot deadlock:
  *
  *  - [startGate] is a process-wide, non-reentrant mutex around the *decision* to run cleanup. It
  *    is held by the cleanup job and, briefly, by [markServiceStarting]. The service never holds it
  *    while waiting for [finishCleanup].
- *  - [ProviderLeaseStore.withLeaseLock] is a short mutex around the lease storage only. The engine
- *    takes it for the write that precedes `addTestProvider`; it is never taken inside [startGate].
+ *  - [ProviderLeaseStore.withLeaseLock] is a short, non-reentrant mutex around the lease storage
+ *    only. Cleanup takes it for the lease read and the release; the engine takes it for the write
+ *    that precedes `addTestProvider`. It is taken *inside* [startGate] by cleanup, but [startGate]
+ *    is never taken inside [withLeaseLock], so the order is one-way and cannot deadlock.
  *
  * The service calls [markServiceStarting] and then [finishCleanup] before starting the runner. That
  * join is what guarantees cleanup and provider registration never overlap. If the cleanup had
@@ -82,7 +84,7 @@ class AppStartupCoordinator(
     }
 
     private suspend fun clearStaleProviders() {
-        val lease = leaseStore.peek() ?: return
+        val lease = leaseStore.withLeaseLock { leaseStore.peek() } ?: return
         // Per design 4.3: an empty lease, a package mismatch or no providers means end directly.
         // A mismatched lease is left untouched rather than released: its providers may still be
         // registered, and a later cold start should see the same evidence.
@@ -93,7 +95,13 @@ class AppStartupCoordinator(
         if (removed.isNotEmpty()) {
             // Only a confirmed removal may clear the lease; SecurityException leaves it for the
             // next cold start. A failed commit also leaves it on disk; the next cold start retries.
-            leaseStore.release(removed)
+            // The release is a read-modify-write of the lease, so it goes under the storage lock
+            // like every other lease write. This nests withLeaseLock inside startGate (one-way,
+            // safe); the gate is what stops the service from acquiring a fresh lease for the same
+            // names until the stale entry is gone.
+            leaseStore.withLeaseLock {
+                leaseStore.release(removed)
+            }
         }
     }
 }

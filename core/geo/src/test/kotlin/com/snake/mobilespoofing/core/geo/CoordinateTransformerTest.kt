@@ -88,4 +88,70 @@ class CoordinateTransformerTest {
         assertEquals(london.latitude, asGcj.latitude, 1e-9)
         assertEquals(london.longitude, asGcj.longitude, 1e-9)
     }
+
+    @Test
+    fun `points at the antimeridian are left alone and round trip`() {
+        // China's bounding box is [72, 137.8] longitude, so ±180 is always outside: the offset
+        // must not be applied and the round trip must be the identity.
+        val eastEdge = GeoPoint(51.0, 179.99, CoordType.WGS84)
+        val westEdge = GeoPoint(-51.0, -179.99, CoordType.WGS84)
+        for (p in listOf(eastEdge, westEdge)) {
+            val asGcj = CoordinateTransformer.wgsToGcj(p)
+            assertEquals(p.latitude, asGcj.latitude, 1e-9)
+            assertEquals(p.longitude, asGcj.longitude, 1e-9)
+            assertEquals(CoordType.GCJ02, asGcj.coordType)
+            val back = CoordinateTransformer.toWgs84(asGcj)
+            assertEquals(0.0, distance(back, p), 1e-9)
+        }
+    }
+
+    @Test
+    fun `negative latitude and longitude pass through unchanged`() {
+        // Southern and western hemispheres are outside China: no offset is applied, though the
+        // datum tag still flips so a caller cannot confuse the two.
+        val southern = GeoPoint(-33.8688, 151.2093, CoordType.WGS84)
+        val western = GeoPoint(40.0, -74.0, CoordType.WGS84)
+        for (p in listOf(southern, western)) {
+            val asGcj = CoordinateTransformer.wgsToGcj(p)
+            assertEquals(p.latitude, asGcj.latitude, 1e-9)
+            assertEquals(p.longitude, asGcj.longitude, 1e-9)
+        }
+    }
+
+    @Test
+    fun `non-finite coordinates pass through without poisoning the finite companion`() {
+        // A NaN latitude used to make the longitude NaN too, because the guard treated NaN as
+        // inside China and ran the offset kernels over it.
+        val nanLat = CoordinateTransformer.wgsToGcj(GeoPoint(Double.NaN, 116.4074, CoordType.WGS84))
+        assertTrue(nanLat.latitude.isNaN())
+        assertEquals(116.4074, nanLat.longitude, 0.0)
+        assertEquals(CoordType.GCJ02, nanLat.coordType)
+
+        val infLng = CoordinateTransformer.toWgs84(
+            GeoPoint(39.9042, Double.POSITIVE_INFINITY, CoordType.GCJ02),
+        )
+        assertEquals(39.9042, infLng.latitude, 0.0)
+        assertTrue(infLng.longitude.isInfinite())
+        assertEquals(CoordType.WGS84, infLng.coordType)
+
+        val negInfLat = CoordinateTransformer.fromWgs84(
+            GeoPoint(Double.NEGATIVE_INFINITY, 116.4074, CoordType.WGS84),
+            CoordType.BD09,
+        )
+        assertTrue(negInfLat.latitude.isInfinite())
+        assertEquals(116.4074, negInfLat.longitude, 0.0)
+    }
+
+    @Test
+    fun `round trip holds across china including its edges`() {
+        val points = listOf(
+            GeoPoint(18.25, 109.5, CoordType.WGS84),     // Sanya, south coast
+            GeoPoint(43.8256, 87.6168, CoordType.WGS84), // Urumqi, north-west
+            GeoPoint(53.55, 122.0, CoordType.WGS84),     // north-east, near the box edge
+        )
+        for (p in points) {
+            val rt = CoordinateTransformer.gcjToWgs(CoordinateTransformer.wgsToGcj(p))
+            assertTrue("$p round-trip was ${distance(rt, p)} m", distance(rt, p) < 0.5)
+        }
+    }
 }

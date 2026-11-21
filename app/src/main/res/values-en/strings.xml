@@ -77,6 +77,25 @@
     <string name="setup_notifications_todo">Open settings</string>
     <string name="setup_open">Open settings</string>
 
+    <!-- Live diagnostics -->
+    <string name="section_diagnostics">Live diagnostics</string>
+    <string name="section_diagnostics_hint">Read-only status from the system and this session</string>
+    <string name="diag_mock_app">Mock location app</string>
+    <string name="diag_mock_app_selected">Accepted by the system</string>
+    <string name="diag_mock_app_not_selected">Not accepted</string>
+    <string name="diag_session_label">This session</string>
+    <string name="diag_session_idle">Not injecting</string>
+    <string name="diag_session_starting">Registering providers</string>
+    <string name="diag_session_running">Registered and pushing</string>
+    <string name="diag_session_degraded">Push degraded</string>
+    <string name="diag_session_stopping">Stopping</string>
+    <string name="diag_session_failed">Registration or push failed</string>
+    <string name="diag_last_failure_label">Last failure</string>
+    <string name="diag_last_failure_none">None</string>
+
+    <!-- Boundary disclaimer -->
+    <string name="note_strong_detection">Note: does not work against apps with strong mock-location detection (e.g. AMap) that filter out simulated locations</string>
+
     <!-- Favorites -->
     <string name="favorites_empty">No favorites yet — pick a point and save it</string>
     <string name="favorite_name_hint">Favorite name</string>

@@ -96,13 +96,49 @@ class LocationManagerMockEngineTest {
 
         assertEquals(EngineStartOutcome.Ok, engine.startMockMode(sessionId = 1L))
 
-        // The failed provider's lease entry is retained; the next cold start cleans it up. This is
-        // the accepted F7 trade-off and must not be silently forgotten.
+        // gps was leased (lease-before-add) and then addProvider threw, so nothing was ever
+        // registered under it; its lease entry is released instead of leaking to the next cold
+        // start (core-7). The acquire itself must still be on record.
         assertTrue(leaseStore.acquired.any { it.second == setOf("gps") })
+        assertEquals(setOf("gps"), leaseStore.releases.single())
 
         val results = engine.stopMockMode()
         assertEquals(listOf("network"), results.map { it.provider })
         assertTrue(results.single().removed)
+    }
+
+    @Test
+    fun `a start that enables nothing rolls back the providers it registered`() = runTest {
+        // addProvider succeeds for both, but setProviderEnabled fails: the providers are touched
+        // (registered) yet enabled stays empty. A failed start must roll them back instead of
+        // leaving registered-but-disabled providers behind (core-5).
+        controller.enableFailures += listOf("gps", "network")
+        val engine = engine()
+
+        val outcome = engine.startMockMode(sessionId = 1L)
+
+        assertTrue(outcome is EngineStartOutcome.Failed)
+        assertTrue(log.lastIndexOf("remove:gps") > log.indexOf("add:gps"))
+        assertTrue(log.lastIndexOf("remove:network") > log.indexOf("add:network"))
+        assertEquals(emptySet<String>(), controller.added)
+        assertEquals(setOf("gps", "network"), leaseStore.releases.single().toSet())
+        assertTrue(leaseStore.releaseUnderLock)
+    }
+
+    @Test
+    fun `a failed registration releases the lease it wrote without a stop`() = runTest {
+        // addProvider throws after the lease was written; the provider never enters `touched`, so a
+        // later stop would not release it. The failure path itself must release the lease (core-7).
+        controller.addFailures += listOf("gps", "network")
+        val engine = engine()
+
+        val outcome = engine.startMockMode(sessionId = 1L)
+
+        assertTrue(outcome is EngineStartOutcome.Failed)
+        assertEquals(setOf("gps", "network"), leaseStore.releases.flatten().toSet())
+        assertTrue(leaseStore.releaseUnderLock)
+        // Nothing was registered, so a stop has nothing left to remove.
+        assertEquals(emptyList<ProviderStopResult>(), engine.stopMockMode())
     }
 
     @Test

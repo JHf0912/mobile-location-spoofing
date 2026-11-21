@@ -20,6 +20,10 @@ class RouteMovementSource(
             "speedMetersPerSecond must be positive, got $speedMetersPerSecond"
         }
         require(route.totalMeters > 0.0) { "route has zero length" }
+        require(endBehavior != EndBehavior.LOOP || route.closedLoop) {
+            "EndBehavior.LOOP walks a closed ring, so the route must be built with closedLoop = true; " +
+                "an open route would teleport back to the start at the end of every cycle"
+        }
     }
 
     /**

@@ -42,7 +42,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -56,6 +55,16 @@ import kotlinx.coroutines.withTimeoutOrNull
 class MockLocationService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /**
+     * Runs the bounded teardown join from [onDestroy] off the main thread.
+     *
+     * Deliberately not [scope]: that scope is cancelled at the end of `onDestroy`, and joining the
+     * (NonCancellable) teardown from a `runBlocking` on the main thread used to stall the UI for up
+     * to [ON_DESTROY_JOIN_TIMEOUT_MS]. This scope's single bounded job completes on its own and is
+     * collected with the service instance, so it does not leak.
+     */
+    private val teardownScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Field injection is populated before onCreate, but not before a property initializer — so
     // these must be lateinit vars used from onCreate onward.
@@ -385,10 +394,13 @@ class MockLocationService : Service() {
         startGuard.requestStop()
         startGateJob?.cancel()
         finishing = true
-        // Best effort and bounded: onDestroy runs on the main thread and a binder call may never
-        // return. If the process is killed before teardown finishes, the persisted lease plus the
-        // next cold-start cleanup are the real protection.
-        runBlocking {
+        // Best effort, bounded, and off the main thread. The runner's teardown is NonCancellable
+        // and runs on its own dispatcher, so a runBlocking join here used to block the UI for up to
+        // ON_DESTROY_JOIN_TIMEOUT_MS on a binder call that may never return. Firing the same
+        // bounded join on a background scope keeps the "stop means cleanup" semantics without the
+        // main-thread stall; if the process is killed before teardown finishes, the persisted lease
+        // plus the next cold-start cleanup are the real protection.
+        teardownScope.launch {
             logIfTeardownExceeded(runner.stopAndJoin(ON_DESTROY_JOIN_TIMEOUT_MS))
         }
         clearStartingPreview()

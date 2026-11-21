@@ -77,6 +77,25 @@
     <string name="setup_notifications_todo">去开启</string>
     <string name="setup_open">打开设置</string>
 
+    <!-- Live diagnostics -->
+    <string name="section_diagnostics">实况诊断</string>
+    <string name="section_diagnostics_hint">来自系统与本会话的只读状态</string>
+    <string name="diag_mock_app">模拟位置应用</string>
+    <string name="diag_mock_app_selected">系统已接受</string>
+    <string name="diag_mock_app_not_selected">未被接受</string>
+    <string name="diag_session_label">本会话注入</string>
+    <string name="diag_session_idle">尚未注入</string>
+    <string name="diag_session_starting">正在注册提供者</string>
+    <string name="diag_session_running">注册并推送正常</string>
+    <string name="diag_session_degraded">推送降级</string>
+    <string name="diag_session_stopping">正在停止</string>
+    <string name="diag_session_failed">注册或推送失败</string>
+    <string name="diag_last_failure_label">最近一次失败</string>
+    <string name="diag_last_failure_none">无</string>
+
+    <!-- Boundary disclaimer -->
+    <string name="note_strong_detection">注意：对会过滤模拟位置的强检测类应用（如高德等）无效</string>
+
     <!-- Favorites -->
     <string name="favorites_empty">暂无收藏，选点后保存</string>
     <string name="favorite_name_hint">收藏名</string>

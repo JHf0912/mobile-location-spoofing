@@ -59,6 +59,9 @@ class AppStartupCoordinatorTest {
         assertTrue(coordinator.finishCleanup(1_000L))
         assertEquals(listOf("gps"), controller.removed)
         assertEquals(listOf(setOf("gps")), store.releases)
+        // core-4: the release of the stale lease is a lease write and must run under withLeaseLock,
+        // exactly like every other lease mutation, rather than bypassing the storage lock.
+        assertTrue(store.releaseUnderLock)
         assertTrue(coordinator.cleanupJob.isCompleted)
     }
 
@@ -158,7 +161,17 @@ class AppStartupCoordinatorTest {
         val allowPeek = CompletableDeferred<Unit>()
         val releases = mutableListOf<Set<String>>()
 
-        override suspend fun <T> withLeaseLock(block: suspend () -> T): T = block()
+        private var lockDepth = 0
+        var releaseUnderLock = true
+
+        override suspend fun <T> withLeaseLock(block: suspend () -> T): T {
+            lockDepth++
+            try {
+                return block()
+            } finally {
+                lockDepth--
+            }
+        }
 
         override suspend fun peek(): ProviderLease? {
             if (blockPeek) {
@@ -171,6 +184,7 @@ class AppStartupCoordinatorTest {
         override suspend fun acquire(sessionId: Long, providers: Collection<String>): Boolean = true
 
         override suspend fun release(providers: Collection<String>): Boolean {
+            releaseUnderLock = releaseUnderLock && lockDepth > 0
             releases += providers.toSet()
             return true
         }

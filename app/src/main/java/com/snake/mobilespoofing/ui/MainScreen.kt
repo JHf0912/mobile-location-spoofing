@@ -27,8 +27,10 @@ import com.snake.mobilespoofing.core.geo.TravelSpeeds
 import com.snake.mobilespoofing.core.model.FavoriteItem
 import com.snake.mobilespoofing.ui.components.AppTopBar
 import com.snake.mobilespoofing.ui.components.BottomActionBar
+import com.snake.mobilespoofing.ui.components.BoundaryNote
 import com.snake.mobilespoofing.ui.components.CoordinateInputField
 import com.snake.mobilespoofing.ui.components.FavoriteSection
+import com.snake.mobilespoofing.ui.components.LiveDiagnosticsCard
 import com.snake.mobilespoofing.ui.components.MapCard
 import com.snake.mobilespoofing.ui.components.ModeSegmentedControl
 import com.snake.mobilespoofing.ui.components.RouteControls
@@ -171,8 +173,26 @@ fun MainScreen(
                 }
             }
 
-            item(key = "favorites") {
+            item(key = "diagnostics") {
                 StaggeredEntrance(index = 4) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
+                        SectionHeader(
+                            title = stringResource(R.string.section_diagnostics),
+                            subtitle = stringResource(R.string.section_diagnostics_hint),
+                        )
+                        LiveDiagnosticsCard(state)
+                    }
+                }
+            }
+
+            item(key = "boundary-note") {
+                StaggeredEntrance(index = 5) {
+                    BoundaryNote()
+                }
+            }
+
+            item(key = "favorites") {
+                StaggeredEntrance(index = 6) {
                     Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
                         SectionHeader(title = stringResource(R.string.section_favorites))
                         FavoriteSection(

@@ -8,6 +8,7 @@
 | --- | --- |
 | [../README.md](../README.md) | 项目简介、能力边界、快速开始、测试与构建 |
 | [../DESIGN.md](../DESIGN.md) | 模块架构、会话状态机、注入管线、UI 设计系统、验收标准 |
+| [capability-boundary.md](capability-boundary.md) | 能力边界与用途约束：mock 标记、过滤类应用、非目标与证据级别 |
 
 ## 优化归档
 
