@@ -6,7 +6,9 @@ import com.snake.mobilespoofing.core.model.Fix
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * Injects through `LocationManager` test providers.
@@ -57,6 +59,10 @@ class LocationManagerMockEngine @Inject constructor(
                     leaseStore.acquire(sessionId, listOf(provider))
                 }
             } catch (e: CancellationException) {
+                // P2-2: cancellation can be observed after acquire's commit wrote the lease but
+                // before it returned. Release just this entry (a no-op if it was never written)
+                // and rethrow — the release must not mask the cancellation.
+                releaseLeaseQuietly(listOf(provider))
                 throw e
             } catch (e: Exception) {
                 leaseFailure = "lease write failed: ${e.message}"
@@ -69,17 +75,17 @@ class LocationManagerMockEngine @Inject constructor(
                 break
             }
 
-            // `added` distinguishes "addProvider failed" from "setProviderEnabled failed": the
-            // former never registered anything system-wide, so the lease just written has no
-            // backing provider and is released below; the latter lands in `touched` and is rolled
-            // back on a failed start or removed on stop.
-            var added = false
+            // `registered` is true only once the provider is tracked in `touched`, i.e. addProvider
+            // succeeded. Any other exit — a failed addProvider or a cancellation in this window —
+            // leaves the lease written above with no backing provider, so the `finally` releases
+            // just this entry (core-7 / P2-2). The success path never releases here.
+            var registered = false
             try {
                 providerController.addProvider(provider)
-                added = true
                 // Track immediately: from here on the provider exists system-wide, even if the
                 // enable call below fails. Teardown must remove it either way.
                 touched += provider
+                registered = true
                 providerController.setProviderEnabled(provider, true)
                 enabled += provider
             } catch (e: CancellationException) {
@@ -87,14 +93,13 @@ class LocationManagerMockEngine @Inject constructor(
             } catch (e: SecurityException) {
                 // The app is not the system's selected mock-location app.
                 problems += "$provider: not selected as the mock location app"
-                if (!added) releaseLeaseQuietly(listOf(provider))
             } catch (e: IllegalArgumentException) {
                 // The provider name is already taken, or is not one this device supports.
                 problems += "$provider: provider unavailable (${e.message})"
-                if (!added) releaseLeaseQuietly(listOf(provider))
             } catch (e: Exception) {
                 problems += "$provider: ${e::class.simpleName}: ${e.message}"
-                if (!added) releaseLeaseQuietly(listOf(provider))
+            } finally {
+                if (!registered) releaseLeaseQuietly(listOf(provider))
             }
         }
 
@@ -172,16 +177,20 @@ class LocationManagerMockEngine @Inject constructor(
      * start failure.
      */
     private suspend fun releaseLeaseQuietly(providers: Collection<String>) {
-        try {
-            leaseStore.withLeaseLock {
-                leaseStore.release(providers)
+        // NonCancellable: this is also reached from cancellation paths (P2-2), where the coroutine
+        // is already cancelled and a plain `withLeaseLock` would rethrow before the durable write.
+        // The lease must be released regardless, and this helper must never throw — rethrowing here
+        // would mask the original failure/cancellation.
+        withContext(NonCancellable) {
+            try {
+                leaseStore.withLeaseLock {
+                    leaseStore.release(providers)
+                }
+            } catch (e: Exception) {
+                // Best effort: a failed release keeps the lease on disk for the next cold start to
+                // retry. Log it so a leaked lease is diagnosable without changing the start outcome.
+                Log.w(TAG, "failed to release lease for $providers: ${e.message}", e)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Best effort: a failed release keeps the lease on disk for the next cold start to
-            // retry. Log it so a leaked lease is diagnosable without changing the start outcome.
-            Log.w(TAG, "failed to release lease for $providers: ${e.message}", e)
         }
     }
 

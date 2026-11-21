@@ -3,6 +3,7 @@ package com.snake.mobilespoofing.core.location
 import com.snake.mobilespoofing.core.model.CoordType
 import com.snake.mobilespoofing.core.model.Fix
 import com.snake.mobilespoofing.core.model.GeoPoint
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -139,6 +140,27 @@ class LocationManagerMockEngineTest {
         assertTrue(leaseStore.releaseUnderLock)
         // Nothing was registered, so a stop has nothing left to remove.
         assertEquals(emptyList<ProviderStopResult>(), engine.stopMockMode())
+    }
+
+    @Test
+    fun `a cancellation after the lease write releases that provider`() = runTest {
+        // Simulates cancellation observed after acquire's commit wrote the lease but before it
+        // returned: the entry must be released rather than linger for the next cold start, and the
+        // cancellation must still propagate (P2-2).
+        leaseStore.cancelOnAcquire = true
+        val engine = engine()
+
+        var thrown: Throwable? = null
+        try {
+            engine.startMockMode(sessionId = 1L)
+        } catch (e: Throwable) {
+            thrown = e
+        }
+
+        assertTrue(thrown is CancellationException)
+        assertEquals(setOf("gps"), leaseStore.acquired.first().second)
+        assertEquals(setOf("gps"), leaseStore.releases.flatten().toSet())
+        assertTrue(leaseStore.releaseUnderLock)
     }
 
     @Test
@@ -285,6 +307,7 @@ class LocationManagerMockEngineTest {
         var failAcquire = false
         var failAcquireOn: String? = null
         var failRelease = false
+        var cancelOnAcquire = false
 
         private var lockDepth = 0
         var acquireUnderLock = true
@@ -306,6 +329,7 @@ class LocationManagerMockEngineTest {
             if (failAcquire || providers.contains(failAcquireOn)) return false
             acquired += sessionId to providers.toSet()
             providers.forEach { log += "acquire:$it" }
+            if (cancelOnAcquire) throw CancellationException("cancelled after commit")
             return true
         }
 

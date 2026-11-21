@@ -32,6 +32,28 @@ fun interface CurrentLocationSource {
     suspend fun current(): GeoPoint?
 }
 
+/**
+ * The platform-independent heart of [AndroidCurrentLocationSource.requestFresh]: walk the enabled
+ * providers in order and return the first non-null result, bounded both per provider and overall.
+ *
+ * Extracted so the budget behaviour is testable on the JVM without `LocationManager`/Robolectric —
+ * [acquire] is the only platform-dependent piece (`Location` in production, any plain type in
+ * tests). A per-provider timeout alone lets two providers run back-to-back for 2 × the per-provider
+ * time; the total budget caps the whole attempt. Both timeouts return null, never a cancellation.
+ */
+internal suspend fun <T> firstWithinBudgets(
+    providers: List<String>,
+    perProviderTimeoutMs: Long,
+    totalTimeoutMs: Long,
+    acquire: suspend (String) -> T?,
+): T? = withTimeoutOrNull(totalTimeoutMs) {
+    for (provider in providers) {
+        val value = withTimeoutOrNull(perProviderTimeoutMs) { acquire(provider) }
+        if (value != null) return@withTimeoutOrNull value
+    }
+    null
+}
+
 @Singleton
 class AndroidCurrentLocationSource @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -72,18 +94,14 @@ class AndroidCurrentLocationSource @Inject constructor(
             .maxByOrNull { it.time }
             ?.let(::toGeoPoint)
 
-    private suspend fun requestFresh(manager: LocationManager, providers: List<String>): GeoPoint? =
-        // A per-provider timeout alone lets two providers run back-to-back for 2 × FIX_TIMEOUT_MS
-        // (~16s), which is far too long for a UI that only needs to seed a picker. The outer budget
-        // caps the whole acquisition: the first provider may use its full share, the rest get only
-        // what remains. A timeout here returns null (cached-seed miss), never a cancellation.
-        withTimeoutOrNull(TOTAL_FIX_TIMEOUT_MS) {
-            for (provider in providers) {
-                val location = withTimeoutOrNull(FIX_TIMEOUT_MS) { awaitCurrent(manager, provider) }
-                if (location != null) return@withTimeoutOrNull toGeoPoint(location)
-            }
-            null
-        }
+    private suspend fun requestFresh(manager: LocationManager, providers: List<String>): GeoPoint? {
+        val location = firstWithinBudgets(
+            providers = providers,
+            perProviderTimeoutMs = FIX_TIMEOUT_MS,
+            totalTimeoutMs = TOTAL_FIX_TIMEOUT_MS,
+        ) { provider -> awaitCurrent(manager, provider) }
+        return location?.let(::toGeoPoint)
+    }
 
     @SuppressLint("MissingPermission")
     private suspend fun awaitCurrent(manager: LocationManager, provider: String): Location? =
