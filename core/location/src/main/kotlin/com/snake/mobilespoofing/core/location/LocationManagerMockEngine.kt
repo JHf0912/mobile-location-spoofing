@@ -76,9 +76,8 @@ class LocationManagerMockEngine @Inject constructor(
             }
 
             // `registered` is true only once the provider is tracked in `touched`, i.e. addProvider
-            // succeeded. Any other exit — a failed addProvider or a cancellation in this window —
-            // leaves the lease written above with no backing provider, so the `finally` releases
-            // just this entry (core-7 / P2-2). The success path never releases here.
+            // succeeded. If addProvider throws, the lease written above has no backing provider, so
+            // the `finally` releases just this entry (core-7). The success path never releases here.
             var registered = false
             try {
                 providerController.addProvider(provider)
@@ -88,8 +87,6 @@ class LocationManagerMockEngine @Inject constructor(
                 registered = true
                 providerController.setProviderEnabled(provider, true)
                 enabled += provider
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: SecurityException) {
                 // The app is not the system's selected mock-location app.
                 problems += "$provider: not selected as the mock location app"
@@ -177,10 +174,12 @@ class LocationManagerMockEngine @Inject constructor(
      * start failure.
      */
     private suspend fun releaseLeaseQuietly(providers: Collection<String>) {
-        // NonCancellable: this is also reached from cancellation paths (P2-2), where the coroutine
-        // is already cancelled and a plain `withLeaseLock` would rethrow before the durable write.
-        // The lease must be released regardless, and this helper must never throw — rethrowing here
-        // would mask the original failure/cancellation.
+        // NonCancellable is an intentional tradeoff: this helper is also reached from the
+        // cancellation path (P2-2), where the coroutine is already cancelled and a plain
+        // `withLeaseLock` would rethrow before the durable write. The cost is one extra bounded
+        // `commit()` on that rare path; correctness — never leaking a stale lease — wins over
+        // saving a single disk write. This helper must never throw, since rethrowing here would
+        // mask the original failure/cancellation.
         withContext(NonCancellable) {
             try {
                 leaseStore.withLeaseLock {

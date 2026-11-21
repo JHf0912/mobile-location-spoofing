@@ -27,6 +27,16 @@ import kotlinx.coroutines.withTimeoutOrNull
  * devices without Google Play services, and a coarse fix is enough to centre the picker. The
  * result is WGS84, which is what [GeoPoint] carries into the editor.
  */
+/**
+ * Per-provider and overall budgets for a fresh fix, exposed as internal so tests can reference the
+ * production values instead of hardcoding them. Two providers run back-to-back, so the total budget
+ * caps the whole [firstWithinBudgets] attempt: the first may use its full share, the rest get the
+ * remainder.
+ */
+internal const val FIX_TIMEOUT_MS = 8_000L
+
+internal const val TOTAL_FIX_TIMEOUT_MS = 10_000L
+
 fun interface CurrentLocationSource {
     /** A cached or freshly acquired fix, or null when location is unavailable/denied. */
     suspend fun current(): GeoPoint?
@@ -125,9 +135,5 @@ class AndroidCurrentLocationSource @Inject constructor(
 
     private companion object {
         val PROVIDERS = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-        const val FIX_TIMEOUT_MS = 8_000L
-
-        /** Overall budget for the whole fresh-acquisition attempt; caps the 2 × [FIX_TIMEOUT_MS] worst case. */
-        const val TOTAL_FIX_TIMEOUT_MS = 10_000L
     }
 }
