@@ -90,6 +90,12 @@ class Route private constructor(
             require(pointsWgs84.all { it.coordType == CoordType.WGS84 }) {
                 "Route waypoints must be WGS84 — convert with CoordinateTransformer first"
             }
+            // Final finite guard. A NaN/Infinity waypoint would otherwise make the dedup's
+            // haversine distance NaN, which the duplicate check then reads as "close enough" and
+            // silently drops — losing a waypoint instead of failing loudly.
+            require(pointsWgs84.all { it.latitude.isFinite() && it.longitude.isFinite() }) {
+                "Route waypoints must have finite coordinates — NaN/Infinity is not a position"
+            }
 
             val points = buildList {
                 pointsWgs84.forEach { candidate ->

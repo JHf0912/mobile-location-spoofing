@@ -41,6 +41,20 @@ class RouteTest {
     }
 
     @Test
+    fun `a route rejects non-finite waypoints instead of silently dropping them`() {
+        // Without the finite guard the NaN haversine distance makes the dedup treat the point as a
+        // duplicate and drop it silently; it must fail loudly instead.
+        listOf(
+            GeoPoint(Double.NaN, 116.4074, CoordType.WGS84),
+            GeoPoint(39.9042, Double.POSITIVE_INFINITY, CoordType.WGS84),
+            GeoPoint(Double.NEGATIVE_INFINITY, 116.4074, CoordType.WGS84),
+        ).forEach { bad ->
+            val exception = runCatching { Route.of(listOf(origin, bad)) }.exceptionOrNull()
+            assertTrue("$bad must be rejected", exception is IllegalArgumentException)
+        }
+    }
+
+    @Test
     fun `consecutive duplicate waypoints are dropped`() {
         val a = origin
         val b = GeoMath.destination(a, 90.0, 1000.0)

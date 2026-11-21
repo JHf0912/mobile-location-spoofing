@@ -27,4 +27,16 @@ class StaticMovementSourceTest {
         // rather than a conversion the source could get wrong.
         assertTrue(exception is IllegalArgumentException)
     }
+
+    @Test
+    fun `rejects a point with non-finite coordinates`() {
+        listOf(
+            GeoPoint(Double.NaN, 116.4074, CoordType.WGS84),
+            GeoPoint(39.9042, Double.POSITIVE_INFINITY, CoordType.WGS84),
+            GeoPoint(Double.NEGATIVE_INFINITY, 116.4074, CoordType.WGS84),
+        ).forEach { point ->
+            val exception = runCatching { StaticMovementSource(point) }.exceptionOrNull()
+            assertTrue("$point must be rejected", exception is IllegalArgumentException)
+        }
+    }
 }

@@ -19,6 +19,10 @@ class StaticMovementSource(private val pointWgs84: GeoPoint) : MovementSource {
         require(pointWgs84.coordType == CoordType.WGS84) {
             "StaticMovementSource requires WGS84, got ${pointWgs84.coordType}"
         }
+        require(pointWgs84.latitude.isFinite() && pointWgs84.longitude.isFinite()) {
+            "StaticMovementSource requires finite coordinates, got " +
+                "(${pointWgs84.latitude}, ${pointWgs84.longitude})"
+        }
     }
 
     override fun fixAt(elapsedMs: Long): Fix = Fix(point = pointWgs84)

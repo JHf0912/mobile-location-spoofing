@@ -1,6 +1,7 @@
 package com.snake.mobilespoofing.core.location
 
 import android.location.LocationManager
+import android.util.Log
 import com.snake.mobilespoofing.core.model.Fix
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -177,8 +178,10 @@ class LocationManagerMockEngine @Inject constructor(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Best effort; a lease that could not be released now is retried by the next cold start.
+        } catch (e: Exception) {
+            // Best effort: a failed release keeps the lease on disk for the next cold start to
+            // retry. Log it so a leaked lease is diagnosable without changing the start outcome.
+            Log.w(TAG, "failed to release lease for $providers: ${e.message}", e)
         }
     }
 
@@ -310,5 +313,7 @@ class LocationManagerMockEngine @Inject constructor(
 
         private const val REREGISTRATION_ATTEMPTS = 3
         private val REREGISTRATION_BACKOFF_MS = longArrayOf(100L, 500L)
+
+        private const val TAG = "LocationManagerMockEngine"
     }
 }

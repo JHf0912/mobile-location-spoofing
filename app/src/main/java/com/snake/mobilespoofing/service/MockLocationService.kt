@@ -61,8 +61,8 @@ class MockLocationService : Service() {
      *
      * Deliberately not [scope]: that scope is cancelled at the end of `onDestroy`, and joining the
      * (NonCancellable) teardown from a `runBlocking` on the main thread used to stall the UI for up
-     * to [ON_DESTROY_JOIN_TIMEOUT_MS]. This scope's single bounded job completes on its own and is
-     * collected with the service instance, so it does not leak.
+     * to [ON_DESTROY_JOIN_TIMEOUT_MS]. The scope is released when its single bounded job completes,
+     * so it does not dangle past `onDestroy`.
      */
     private val teardownScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -400,8 +400,15 @@ class MockLocationService : Service() {
         // bounded join on a background scope keeps the "stop means cleanup" semantics without the
         // main-thread stall; if the process is killed before teardown finishes, the persisted lease
         // plus the next cold-start cleanup are the real protection.
+        //
+        // The scope is cancelled only when the join completes, not immediately: cancelling up front
+        // would stop this coroutine before stop() runs and could cut off the NonCancellable
+        // engine.stopMockMode() cleanup. Releasing on completion (normal or otherwise) lets the
+        // cleanup finish and still collects the scope instead of leaving it dangling.
         teardownScope.launch {
             logIfTeardownExceeded(runner.stopAndJoin(ON_DESTROY_JOIN_TIMEOUT_MS))
+        }.invokeOnCompletion {
+            teardownScope.cancel()
         }
         clearStartingPreview()
         startGuard.finishStart()

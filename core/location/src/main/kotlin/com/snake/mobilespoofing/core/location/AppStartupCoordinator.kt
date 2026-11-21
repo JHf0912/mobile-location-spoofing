@@ -84,6 +84,12 @@ class AppStartupCoordinator(
     }
 
     private suspend fun clearStaleProviders() {
+        // Two separate, short [withLeaseLock] sections — not one atomic read-modify-write. The
+        // peek holds the lock only to read a consistent snapshot; the release re-acquires it later
+        // to mutate. That gap is safe because the whole cleanup runs under [startGate] (see
+        // [runCleanup]) and the service does not acquire a lease until [finishCleanup] returns, so
+        // no other lease writer can interleave. The provider removal in between must stay outside
+        // [withLeaseLock]: it is a LocationManager call, not a storage read/write.
         val lease = leaseStore.withLeaseLock { leaseStore.peek() } ?: return
         // Per design 4.3: an empty lease, a package mismatch or no providers means end directly.
         // A mismatched lease is left untouched rather than released: its providers may still be
@@ -95,10 +101,8 @@ class AppStartupCoordinator(
         if (removed.isNotEmpty()) {
             // Only a confirmed removal may clear the lease; SecurityException leaves it for the
             // next cold start. A failed commit also leaves it on disk; the next cold start retries.
-            // The release is a read-modify-write of the lease, so it goes under the storage lock
-            // like every other lease write. This nests withLeaseLock inside startGate (one-way,
-            // safe); the gate is what stops the service from acquiring a fresh lease for the same
-            // names until the stale entry is gone.
+            // A second, independent short lock for the release (see the note above): not held
+            // across the provider removal, only across the storage write.
             leaseStore.withLeaseLock {
                 leaseStore.release(removed)
             }
