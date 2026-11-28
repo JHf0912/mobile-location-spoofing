@@ -21,7 +21,7 @@ targetSdk = "37"
 # Pinned to the highest version Android Studio 2025.3 (build 253.x) accepts; it refuses to
 # import anything newer than AGP 9.1.0. AGP 9.1.x still supports compileSdk 37, so the Compose
 # BOM does not have to move with it — only the Gradle wrapper does (9.3.1, its minimum = default).
-agp = "9.1.0"
+agp = "9.5.3"
 hilt = "2.60.1"
 # AGP 9 has built-in Kotlin: it brings its own KGP (2.3.10 for AGP 9.2) and the
 # `org.jetbrains.kotlin.android` plugin must NOT be applied. This `kotlin` version therefore only
